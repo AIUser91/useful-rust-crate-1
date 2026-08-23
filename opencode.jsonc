@@ -5,12 +5,11 @@
       "npm": "@ai-sdk/mistral",
       "name": "Mistral",
       "api_key": "MISTRAL_API_KEY",
-      "models": {
-        "mistral-large-latest": {
-          "name": "Mistral Large 2"
-        }
-      }
-    }
+    },
+  "logfare": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Logfare.ai",
+      "api_key": "LOGFARE_API_KEY",
   },
   "small_model": "opencode/big-pickle",
   "permission": {
