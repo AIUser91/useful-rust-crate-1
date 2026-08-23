@@ -33,7 +33,9 @@ jobs:
 
       - uses: anomalyco/opencode/github@latest
         with:
+          use_github_token: true
           model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
           prompt: ${{ env.PROMPT_TEXT }}
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
