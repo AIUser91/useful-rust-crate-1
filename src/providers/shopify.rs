@@ -239,7 +239,10 @@ mod tests {
             assert_eq!(result, Err(expected.clone()), "input: {value:?}");
         }
 
-        for value in ["not base64!!", "dXEH6g6yUJ/CESIczphLijdXC211hsIsRvQ3nIsEPhc"] {
+        for value in [
+            "not base64!!",
+            "dXEH6g6yUJ/CESIczphLijdXC211hsIsRvQ3nIsEPhc",
+        ] {
             let result = verify(
                 crate::Provider::Shopify,
                 &[(SIGNATURE_HEADER, value)],

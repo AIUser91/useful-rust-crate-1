@@ -59,8 +59,7 @@ pub(crate) fn verify(
     // Signed string is `{timestamp_as_sent}.{raw_body}`; the raw timestamp
     // substring is reused verbatim so whatever was actually signed is what
     // gets verified.
-    let mut signed_string =
-        Vec::with_capacity(parsed.timestamp_raw.len() + 1 + raw_body.len());
+    let mut signed_string = Vec::with_capacity(parsed.timestamp_raw.len() + 1 + raw_body.len());
     signed_string.extend_from_slice(parsed.timestamp_raw.as_bytes());
     signed_string.push(b'.');
     signed_string.extend_from_slice(raw_body);
@@ -156,13 +155,12 @@ fn parse_header(value: &str) -> Result<ParsedHeader<'_>, VerifyError> {
         }
     };
 
-    let timestamp =
-        timestamp_raw
-            .parse::<u64>()
-            .map_err(|_| VerifyError::MalformedHeader {
-                header: SIGNATURE_HEADER,
-                reason: "timestamp is not a valid unix timestamp",
-            })?;
+    let timestamp = timestamp_raw
+        .parse::<u64>()
+        .map_err(|_| VerifyError::MalformedHeader {
+            header: SIGNATURE_HEADER,
+            reason: "timestamp is not a valid unix timestamp",
+        })?;
 
     if signatures.is_empty() {
         return Err(VerifyError::MalformedHeader {
@@ -338,11 +336,19 @@ mod tests {
         let stale = "5257a869e7ecebeda32affa62cdca3fa51cad7e77a0e56ff536d0ce8e108d8bd";
         let opts = clocked_at(TIMESTAMP, Some(Duration::from_secs(300)));
         assert_eq!(
-            verify_with(BODY, &format!("t={TIMESTAMP},v1={stale},v1={SIGNATURE}"), opts.clone()),
+            verify_with(
+                BODY,
+                &format!("t={TIMESTAMP},v1={stale},v1={SIGNATURE}"),
+                opts.clone()
+            ),
             Ok(())
         );
         assert_eq!(
-            verify_with(BODY, &format!("t={TIMESTAMP},v1={SIGNATURE},v1={stale}"), opts),
+            verify_with(
+                BODY,
+                &format!("t={TIMESTAMP},v1={SIGNATURE},v1={stale}"),
+                opts
+            ),
             Ok(())
         );
     }
@@ -362,7 +368,10 @@ mod tests {
     #[test]
     fn tampered_body_fails() {
         assert_eq!(
-            verify_fresh(b"{\"id\":\"evt_test_webhook\",\"object\":\"eventX\"}", SIGNATURE),
+            verify_fresh(
+                b"{\"id\":\"evt_test_webhook\",\"object\":\"eventX\"}",
+                SIGNATURE
+            ),
             Err(VerifyError::SignatureMismatch)
         );
     }
@@ -395,11 +404,7 @@ mod tests {
     fn replay_old_timestamp_out_of_tolerance() {
         // Valid signature, delivered 301s after signing: rejected.
         let options = clocked_at(TIMESTAMP + 301, Some(Duration::from_secs(300)));
-        let result = verify_with(
-            BODY,
-            &format!("t={TIMESTAMP},v1={SIGNATURE}"),
-            options,
-        );
+        let result = verify_with(BODY, &format!("t={TIMESTAMP},v1={SIGNATURE}"), options);
         assert_eq!(
             result,
             Err(VerifyError::TimestampOutOfTolerance {
@@ -414,11 +419,7 @@ mod tests {
         // Symmetric window: a timestamp more than max_age in the future (only
         // possible via sender/receiver clock trouble) is also rejected.
         let options = clocked_at(TIMESTAMP - 301, Some(Duration::from_secs(300)));
-        let result = verify_with(
-            BODY,
-            &format!("t={TIMESTAMP},v1={SIGNATURE}"),
-            options,
-        );
+        let result = verify_with(BODY, &format!("t={TIMESTAMP},v1={SIGNATURE}"), options);
         assert_eq!(
             result,
             Err(VerifyError::TimestampOutOfTolerance {
