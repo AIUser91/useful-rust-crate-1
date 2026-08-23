@@ -1,16 +1,16 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "provider": {
-    "cerebras": {
+    "sambanova": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "Cerebras",
+      "name": "SambaNova",
       "options": {
-        "baseURL": "https://api.cerebras.ai/v1"
+        "baseURL": "https://api.sambanova.ai/v1"
       },
-      "api_key": "CEREBRAS_API_KEY",
+      "api_key": "SAMBANOVA_API_KEY",
       "models": {
-        "llama3.3-70b": {
-          "name": "Llama 3.3 70B"
+        "Meta-Llama-3.1-70B-Instruct": {
+          "name": "Llama 3.1 70B"
         }
       }
     }
