@@ -90,6 +90,14 @@ pub fn verify(
 ) -> Result<(), VerifyError>;
 ```
 
+Implementation status (kept in sync with the code — do not let this drift):
+
+- All `Provider` variants ship up front so adding providers later is
+  non-breaking. A variant without an implementation yet fails closed:
+  `verify()` returns `UnsupportedProvider` for it.
+- `Custom(CustomScheme)` is **not** in the shipped enum yet; §2.2 is the
+  design it will be implemented against.
+
 ### 2.1 `VerifyError`
 
 ```rust

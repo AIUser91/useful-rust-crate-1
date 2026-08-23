@@ -74,22 +74,24 @@ hand-copied signing-string logic to get wrong.
 
 | Provider | Scheme | Status |
 |---|---|---|
-| Stripe | HMAC-SHA256 over `timestamp.body`, tolerance window | ✅ |
 | GitHub | HMAC-SHA256, `X-Hub-Signature-256` | ✅ |
-| Shopify | HMAC-SHA256, base64, `X-Shopify-Hmac-SHA256` | ✅ |
-| Slack | HMAC-SHA256 `v0=` scheme, `X-Slack-Signature` + timestamp | ✅ |
-| Square | HMAC-SHA256, hex secret | ✅ |
-| Twilio | HMAC-SHA1 over URL + sorted params | ✅ |
-| Discord | Ed25519 (public-key), no shared secret | ✅ |
-| PayPal | Certificate-based / API verification | ✅ |
-| SendGrid | ECDSA (asymmetric) | ✅ |
-| Linear | HMAC-SHA256, `linear-signature` | ✅ |
-| Zoom | HMAC-SHA256, `v0=` scheme | ✅ |
-| Dropbox | HMAC-SHA256, `X-Dropbox-Signature` | ✅ |
-| Standard Webhooks spec (Svix, Clerk, Resend, ...) | HMAC-SHA256, `webhook-signature` | ✅ |
-| Custom | User-supplied HMAC scheme via `Provider::Custom(..)` | ✅ |
+| Stripe | HMAC-SHA256 over `timestamp.body`, tolerance window | 🚧 [planned](../../issues) |
+| Shopify | HMAC-SHA256, base64, `X-Shopify-Hmac-SHA256` | 🚧 planned |
+| Slack | HMAC-SHA256 `v0=` scheme, `X-Slack-Signature` + timestamp | 🚧 planned |
+| Square | HMAC-SHA256, hex secret | 🚧 planned |
+| Twilio | HMAC-SHA1 over URL + sorted params | 🚧 planned |
+| Discord | Ed25519 (public-key), no shared secret | 🚧 planned |
+| PayPal | Certificate-based / API verification | 🚧 planned (blocked on spec §7) |
+| SendGrid | ECDSA (asymmetric) | 🚧 planned (blocked on spec §7) |
+| Linear | HMAC-SHA256, `linear-signature` | 🚧 planned |
+| Zoom | HMAC-SHA256, `v0=` scheme | 🚧 planned |
+| Dropbox | HMAC-SHA256, `X-Dropbox-Signature` | 🚧 planned |
+| Standard Webhooks spec (Svix, Clerk, Resend, ...) | HMAC-SHA256, `webhook-signature` | 🚧 planned |
+| Custom | User-supplied HMAC scheme via `Provider::Custom(..)` | 🚧 planned |
 
-See [`spec.md`](./spec.md) for the exact signed-string construction, header
+Providers marked 🚧 exist as fail-closed variants of the `Provider` enum:
+passing one to `verify()` returns `VerifyError::UnsupportedProvider`. See
+[`spec.md`](./spec.md) for the exact signed-string construction, header
 names, and encoding for each provider, and the process for adding new ones.
 
 ## Installation
