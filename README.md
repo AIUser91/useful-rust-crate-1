@@ -76,7 +76,7 @@ hand-copied signing-string logic to get wrong.
 |---|---|---|
 | GitHub | HMAC-SHA256, `X-Hub-Signature-256` | ✅ |
 | Stripe | HMAC-SHA256 over `timestamp.body`, tolerance window | 🚧 [planned](../../issues) |
-| Shopify | HMAC-SHA256, base64, `X-Shopify-Hmac-SHA256` | 🚧 planned |
+| Shopify | HMAC-SHA256, base64, `X-Shopify-Hmac-Sha256` | ✅ |
 | Slack | HMAC-SHA256 `v0=` scheme, `X-Slack-Signature` + timestamp | 🚧 planned |
 | Square | HMAC-SHA256, hex secret | 🚧 planned |
 | Twilio | HMAC-SHA1 over URL + sorted params | 🚧 planned |
