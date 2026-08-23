@@ -130,6 +130,9 @@ shouldn't verify does" report as security-relevant until proven otherwise:
 
 ## 7. Things to explicitly avoid doing on your own initiative
 
+- Avoid using `cargo search` since it's too slow. Use `cargo add <crate>`
+  which automatically fetches the latest version and updates Cargo.toml
+  in one step.
 - Do not add speculative providers "while you're in there" without a
   linked, verifiable source for their signing scheme.
 - Do not refactor `src/core/*` opportunistically inside a provider-focused
