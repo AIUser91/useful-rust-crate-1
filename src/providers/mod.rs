@@ -7,6 +7,7 @@
 
 mod github;
 mod shopify;
+mod stripe;
 
 use crate::core::VerifyOptions;
 use crate::core::error::VerifyError;
@@ -71,8 +72,8 @@ pub fn verify(
     match provider {
         Provider::GitHub => github::verify(headers, raw_body, secret, &options),
         Provider::Shopify => shopify::verify(headers, raw_body, secret, &options),
-        Provider::Stripe
-        | Provider::Slack
+        Provider::Stripe => stripe::verify(headers, raw_body, secret, &options),
+        Provider::Slack
         | Provider::Square
         | Provider::Twilio
         | Provider::Discord
