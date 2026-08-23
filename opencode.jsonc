@@ -1,11 +1,13 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "provider": {
-    "openai": {
+    "cerebras": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Cerebras",
       "options": {
-        "baseURL": "https://api.cerebras.ai/v1",
-        "compatibility": "compatible"
+        "baseURL": "https://api.cerebras.ai/v1"
       },
+      "api_key": "CEREBRAS_API_KEY",
       "models": {
         "llama3.3-70b": {
           "name": "Llama 3.3 70B"
