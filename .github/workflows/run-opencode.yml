@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      id-token: write
       contents: write
       pull-requests: write
       issues: write
@@ -37,8 +36,8 @@ jobs:
       - uses: anomalyco/opencode/github@github-v1.2.19
         with:
           use_github_token: true
-          model: opencode/big-pickle
+          model: cerebras/llama3.3-70b
           prompt: ${{ env.PROMPT_TEXT }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
