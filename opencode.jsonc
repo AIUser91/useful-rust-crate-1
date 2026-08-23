@@ -1,16 +1,13 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "provider": {
-    "sambanova": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "SambaNova",
-      "options": {
-        "baseURL": "https://api.sambanova.ai/v1"
-      },
-      "api_key": "SAMBANOVA_API_KEY",
+    "mistral": {
+      "npm": "@ai-sdk/mistral",
+      "name": "Mistral",
+      "api_key": "MISTRAL_API_KEY",
       "models": {
-        "Meta-Llama-3.1-70B-Instruct": {
-          "name": "Llama 3.1 70B"
+        "mistral-large-latest": {
+          "name": "Mistral Large 2"
         }
       }
     }
