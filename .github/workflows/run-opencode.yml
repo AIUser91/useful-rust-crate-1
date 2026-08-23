@@ -1,0 +1,39 @@
+name: Scheduled OpenCode
+on:
+  schedule:
+    - cron: "30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: scheduled-opencode
+  cancel-in-progress: false
+
+jobs:
+  opencode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Load prompt from file
+        id: load_prompt
+        run: |
+          delim="EOF_$(openssl rand -hex 8)"
+          echo "PROMPT_TEXT<<$delim" >> "$GITHUB_ENV"
+          cat .opencode/prompt.md >> "$GITHUB_ENV"
+          echo "$delim" >> "$GITHUB_ENV"
+
+      - uses: anomalyco/opencode/github@latest
+        with:
+          model: nvidia/nemotron-3-ultra-550b-a55b:free
+          prompt: ${{ env.PROMPT_TEXT }}
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
