@@ -36,7 +36,7 @@ jobs:
       - uses: anomalyco/opencode/github@latest
         with:
           use_github_token: true
-          model: mistral/mistral-large-latest
+          model: ${{ env.MODEL }}
           prompt: ${{ env.PROMPT_TEXT }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
