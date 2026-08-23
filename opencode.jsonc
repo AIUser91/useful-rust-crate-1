@@ -3,7 +3,8 @@
   "provider": {
     "openai": {
       "options": {
-        "baseURL": "https://api.cerebras.ai/v1"
+        "baseURL": "https://api.cerebras.ai/v1",
+        "compatibility": "compatible"
       },
       "models": {
         "llama3.3-70b": {
