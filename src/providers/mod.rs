@@ -6,6 +6,7 @@
 //! [`VerifyError::UnsupportedProvider`].
 
 mod github;
+mod shopify;
 
 use crate::core::VerifyOptions;
 use crate::core::error::VerifyError;
@@ -69,8 +70,8 @@ pub fn verify(
 ) -> Result<(), VerifyError> {
     match provider {
         Provider::GitHub => github::verify(headers, raw_body, secret, &options),
+        Provider::Shopify => shopify::verify(headers, raw_body, secret, &options),
         Provider::Stripe
-        | Provider::Shopify
         | Provider::Slack
         | Provider::Square
         | Provider::Twilio

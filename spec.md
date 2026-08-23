@@ -179,7 +179,8 @@ body, multi-value headers, etc.).
 
 ### Shopify
 
-- Header: `X-Shopify-Hmac-SHA256: <base64_hmac>`
+- Header: `X-Shopify-Hmac-Sha256: <base64_hmac>` (lookup is case-insensitive;
+  this matches the casing in Shopify's own docs)
 - Signed string: raw body bytes, unmodified
 - Algorithm: HMAC-SHA256, **base64**-encoded (not hex — a common bug source)
 - No timestamp in the signature scheme.
