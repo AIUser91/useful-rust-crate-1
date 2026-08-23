@@ -11,7 +11,7 @@
       "name": "Logfare.ai",
       "options": {
         "baseURL": "https://logfare.ai/v1",
-        "apiKey": "LOGFARE_API_KEY",
+        "apiKey": "${LOGFARE_API_KEY}",
       },
       "models": {
         "kimi-k3": { "name": "Kimi K3" }
