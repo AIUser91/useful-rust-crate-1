@@ -97,7 +97,6 @@ Implementation status (kept in sync with the code — do not let this drift):
   `verify()` returns `UnsupportedProvider` for it.
 - `Custom(CustomScheme)` is **not** in the shipped enum yet; §2.2 is the
   design it will be implemented against.
-```
 
 ### 2.1 `VerifyError`
 
