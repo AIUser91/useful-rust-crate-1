@@ -185,6 +185,13 @@ body, multi-value headers, etc.).
 - Algorithm: HMAC-SHA256, **base64**-encoded (not hex — a common bug source)
 - No timestamp in the signature scheme.
 
+### Linear
+
+- Header: `linear-signature: <hex_hmac>`
+- Signed string: raw body bytes, unmodified
+- Algorithm: HMAC-SHA256, hex-encoded
+- No timestamp in the signature scheme.
+
 ### Slack
 
 - Headers: `X-Slack-Signature: v0=<hex_hmac>`, `X-Slack-Request-Timestamp`

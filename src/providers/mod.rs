@@ -6,6 +6,7 @@
 //! [`VerifyError::UnsupportedProvider`].
 
 mod github;
+mod linear;
 mod shopify;
 mod slack;
 mod stripe;
@@ -72,6 +73,7 @@ pub fn verify(
 ) -> Result<(), VerifyError> {
     match provider {
         Provider::GitHub => github::verify(headers, raw_body, secret, &options),
+        Provider::Linear => linear::verify(headers, raw_body, secret, &options),
         Provider::Shopify => shopify::verify(headers, raw_body, secret, &options),
         Provider::Slack => slack::verify(headers, raw_body, secret, &options),
         Provider::Stripe => stripe::verify(headers, raw_body, secret, &options),
@@ -80,7 +82,6 @@ pub fn verify(
         | Provider::Discord
         | Provider::PayPal
         | Provider::SendGrid
-        | Provider::Linear
         | Provider::Zoom
         | Provider::Dropbox
         | Provider::StandardWebhooks => Err(VerifyError::UnsupportedProvider),

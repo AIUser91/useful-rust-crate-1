@@ -78,12 +78,12 @@ hand-copied signing-string logic to get wrong.
 | Stripe | HMAC-SHA256 over `timestamp.body`, tolerance window | ✅ |
 | Shopify | HMAC-SHA256, base64, `X-Shopify-Hmac-Sha256` | ✅ |
 | Slack | HMAC-SHA256 `v0=` scheme, `X-Slack-Signature` + timestamp | ✅ |
+| Linear | HMAC-SHA256, `linear-signature` | ✅ |
 | Square | HMAC-SHA256, hex secret | 🚧 planned |
 | Twilio | HMAC-SHA1 over URL + sorted params | 🚧 planned |
 | Discord | Ed25519 (public-key), no shared secret | 🚧 planned |
 | PayPal | Certificate-based / API verification | 🚧 planned (blocked on spec §7) |
 | SendGrid | ECDSA (asymmetric) | 🚧 planned (blocked on spec §7) |
-| Linear | HMAC-SHA256, `linear-signature` | 🚧 planned |
 | Zoom | HMAC-SHA256, `v0=` scheme | 🚧 planned |
 | Dropbox | HMAC-SHA256, `X-Dropbox-Signature` | 🚧 planned |
 | Standard Webhooks spec (Svix, Clerk, Resend, ...) | HMAC-SHA256, `webhook-signature` | 🚧 planned |
