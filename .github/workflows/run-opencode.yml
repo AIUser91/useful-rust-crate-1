@@ -31,6 +31,9 @@ jobs:
           cat .opencode/prompt.md >> "$GITHUB_ENV"
           echo "$delim" >> "$GITHUB_ENV"
 
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
       - uses: anomalyco/opencode/github@github-v1.2.19
         with:
           use_github_token: true
