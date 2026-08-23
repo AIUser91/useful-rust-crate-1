@@ -34,7 +34,7 @@ jobs:
       - uses: anomalyco/opencode/github@github-v1.2.19
         with:
           use_github_token: true
-          model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
+          model: opencode/big-pickle
           prompt: ${{ env.PROMPT_TEXT }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
