@@ -40,3 +40,4 @@ jobs:
           prompt: ${{ env.PROMPT_TEXT }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MISTRAL_API_TOKEN: ${{ secrets.MISTRAL_API_TOKEN }}
