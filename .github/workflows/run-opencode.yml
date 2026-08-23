@@ -36,7 +36,7 @@ jobs:
       - uses: anomalyco/opencode/github@github-v1.2.19
         with:
           use_github_token: true
-          model: cerebras/llama3.3-70b
+          model: openai/llama3.3-70b
           prompt: ${{ env.PROMPT_TEXT }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
