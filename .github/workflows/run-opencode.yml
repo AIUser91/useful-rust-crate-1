@@ -40,4 +40,3 @@ jobs:
           prompt: ${{ env.PROMPT_TEXT }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LOGFARE_API_KEY: ${{ secrets.LOGFARE_API_KEY }}

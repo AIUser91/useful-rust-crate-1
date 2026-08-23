@@ -1,23 +1,5 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "mistral": {
-      "npm": "@ai-sdk/mistral",
-      "name": "Mistral",
-      "api_key": "MISTRAL_API_KEY",
-    },
-    "logfare": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Logfare.ai",
-      "options": {
-        "baseURL": "https://logfare.ai/v1",
-        "apiKey": "${LOGFARE_API_KEY}",
-      },
-      "models": {
-        "kimi-k3": { "name": "Kimi K3" }
-      }
-    },
-  },
   "small_model": "opencode/big-pickle",
   "permission": {
     "edit": "allow",
