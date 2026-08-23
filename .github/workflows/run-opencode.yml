@@ -40,4 +40,4 @@ jobs:
           prompt: ${{ env.PROMPT_TEXT }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
