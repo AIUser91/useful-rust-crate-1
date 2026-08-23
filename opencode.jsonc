@@ -9,8 +9,10 @@
     "logfare": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Logfare.ai",
-      "base_url": "https://logfare.ai/v1/",
       "api_key": "LOGFARE_API_KEY",
+      "options": {
+        "baseURL": "https://logfare.ai/v1"
+      },
       "models": {
         "kimi-k3": { "name": "Kimi K3" }
       }
