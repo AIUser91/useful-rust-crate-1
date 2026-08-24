@@ -10,6 +10,7 @@ mod github;
 mod linear;
 mod shopify;
 mod slack;
+mod square;
 mod standard_webhooks;
 mod stripe;
 
@@ -83,12 +84,12 @@ pub fn verify(
         Provider::Linear => linear::verify(headers, raw_body, secret, &options),
         Provider::Shopify => shopify::verify(headers, raw_body, secret, &options),
         Provider::Slack => slack::verify(headers, raw_body, secret, &options),
+        Provider::Square => square::verify(headers, raw_body, secret, &options),
         Provider::Stripe => stripe::verify(headers, raw_body, secret, &options),
         Provider::StandardWebhooks => {
             standard_webhooks::verify(headers, raw_body, secret, &options)
         }
-        Provider::Square
-        | Provider::Twilio
+        Provider::Twilio
         | Provider::PayPal
         | Provider::SendGrid
         | Provider::Zoom

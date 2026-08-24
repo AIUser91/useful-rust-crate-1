@@ -21,6 +21,9 @@ const IMPLEMENTED: &[Provider] = &[
     Provider::Shopify,
     Provider::Slack,
     Provider::Linear,
+    // Square needs VerifyOptions::request_url to get past its context check
+    // and into the signature path.
+    Provider::Square,
     Provider::StandardWebhooks,
     // Discord's secret is a hex public key; the arbitrary-secret loop below
     // exercises its InvalidSecret decoding paths too.
@@ -38,13 +41,14 @@ fn attempt(
     headers: &dyn webhook_verify::HeaderMap,
     body: &[u8],
     secret: &str,
+    options: &VerifyOptions,
 ) {
     let _ = webhook_verify::verify(
         provider,
         headers,
         body,
         &Secret::new(secret),
-        VerifyOptions::default(),
+        options.clone(),
     );
 }
 
@@ -65,15 +69,21 @@ fuzz_target!(|data: &[u8]| {
         }
     }
 
+    // URL-scoped schemes need request context to reach their signature path.
+    let url_scoped_options =
+        VerifyOptions::default().with_request_url("https://example.com/webhook");
+
     // Fail-closed dispatch for not-yet-implemented variants must also never
-    // panic.
-    attempt(Provider::Square, &headers, body, WELL_FORMED_SECRET);
+    // panic (Square now has an implementation; it is exercised via
+    // IMPLEMENTED below, with and without its required URL context).
+    attempt(Provider::Square, &headers, body, WELL_FORMED_SECRET, &url_scoped_options);
+    attempt(Provider::Square, &headers, body, WELL_FORMED_SECRET, &VerifyOptions::default());
 
     for &provider in IMPLEMENTED {
-        attempt(provider, &headers, body, WELL_FORMED_SECRET);
+        attempt(provider, &headers, body, WELL_FORMED_SECRET, &url_scoped_options);
         // Arbitrary secret bytes exercise the key-decoding failure paths
         // (e.g. Standard Webhooks' lenient base64) without panicking.
         let arbitrary_secret = String::from_utf8_lossy(body);
-        attempt(provider, &headers, body, &arbitrary_secret);
+        attempt(provider, &headers, body, &arbitrary_secret, &url_scoped_options);
     }
 });

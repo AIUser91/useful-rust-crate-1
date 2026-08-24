@@ -182,6 +182,7 @@ mod tests {
         let options = VerifyOptions {
             max_age: Some(Duration::ZERO),
             clock: None,
+            request_url: None,
         };
         let result = verify(
             crate::Provider::Shopify,

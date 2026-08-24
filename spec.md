@@ -66,6 +66,9 @@ pub struct VerifyOptions {
     pub max_age: Option<Duration>,
     /// Clock used for "now", injectable for deterministic tests.
     pub clock: Option<Arc<dyn Clock>>,
+    /// Full URL of the receiving endpoint, for URL-scoped schemes
+    /// (currently Square). See §3.
+    pub request_url: Option<String>,
 }
 
 impl Default for VerifyOptions {
@@ -110,6 +113,7 @@ pub enum VerifyError {
     TimestampOutOfTolerance { skew: Duration, max_age: Duration },
     UnsupportedProvider,
     InvalidSecret { reason: &'static str },
+    MissingContext { reason: &'static str },
 }
 ```
 
@@ -126,6 +130,11 @@ Design rules for errors:
   noise differently from active-attack signals), but treat both as "reject
   the request" outcomes — never treat a malformed header as "skip
   verification."
+- `MissingContext` signals caller misconfiguration (required request context,
+  such as Square's notification URL, absent from `VerifyOptions`) rather than
+  malformed or forged input. It exists so configuration errors are not
+  disguised as `SignatureMismatch` attack signals; the request is still
+  rejected.
 
 ### 2.2 `CustomScheme`
 
@@ -202,12 +211,28 @@ body, multi-value headers, etc.).
 
 ### Square
 
+Source: <https://developer.squareup.com/docs/webhooks/step3validate> ("Verify
+and Validate an Event Notification") and the reference implementations in
+Square's official SDKs (e.g. `square-python-sdk`
+`square/utils/webhooks_helper.py`, `square-php-sdk` `WebhooksHelper`).
+
 - Header: `x-square-hmacsha256-signature: <base64_hmac>`
-- Signed string: `"{notification_url}{raw_body}"` (the full webhook
-  subscription URL is part of the signed content — this is the one scheme
-  where the caller must supply an extra piece of context, so `verify()`
-  accepts it via `VerifyOptions` or a provider-specific builder)
-- Secret is provided by Square hex-encoded; decode before use as HMAC key.
+- Signed string: `"{notification_url}{raw_body}"` — the webhook subscription's
+  notification URL concatenated directly with the raw body, no separator.
+  This is the one shipped scheme where verification cannot proceed from
+  headers + body + secret alone, so the caller supplies the URL via
+  [`VerifyOptions::request_url`] (decided API shape; a missing or empty URL
+  fails closed with `MissingContext`). The value must be the exact
+  dashboard-configured constant — reconstructing it from request headers
+  behind a proxy is the classic failure mode.
+- Secret is the subscription's signature key used **as its UTF-8 bytes**.
+  Provenance note: earlier drafts of this spec said the key arrives
+  hex-encoded and must be decoded first. That matched Square's retired key
+  format but not any current official source: every current SDK hashes the key
+  string as UTF-8 directly, and the docs' own example key (`asdf1234`) is not
+  valid hexadecimal. An empty key fails closed with `InvalidSecret`.
+- Algorithm: HMAC-SHA256 over the signed string, base64-encoded
+- No timestamp in the signature scheme (`max_age` has no effect).
 
 ### Twilio
 
