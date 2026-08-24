@@ -246,9 +246,28 @@ body, multi-value headers, etc.).
 
 ### Standard Webhooks spec
 
-- Headers: `webhook-id`, `webhook-timestamp`, `webhook-signature: v1,<base64_hmac>[ v1,<...>]`
-- Signed string: `"{webhook-id}.{webhook-timestamp}.{raw_body}"`
-- Algorithm: HMAC-SHA256, base64-encoded, secret is `whsec_`-prefixed base64
+Source: <https://www.standardwebhooks.com> and the canonical spec at
+<https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md>
+(reference implementations in that repo are the tie-breaker for any
+ambiguity).
+
+- Headers: `webhook-id`, `webhook-timestamp` (integer unix seconds),
+  `webhook-signature`
+- Signature header format: space-delimited list of versioned signatures;
+  symmetric signatures are `v1,<base64_hmac>` (standard alphabet, padded).
+  During zero-downtime secret rotation a match on *any* `v1` element is
+  accepted; non-`v1` elements (e.g. asymmetric `v1a`) are ignored, matching
+  the reference libraries' forward-compatible behavior.
+- Signed string: `"{webhook-id}.{webhook-timestamp}.{raw_body}"` — literal
+  dot joins, with the id and timestamp taken verbatim from their headers
+- Algorithm: HMAC-SHA256 over the signed string, base64-encoded
+- Secret serialization: `whsec_`-prefixed base64; strip the prefix (if
+  present) and base64-decode — leniently, tolerating unpadded input and
+  non-canonical trailing bits as the official libraries do — before use as
+  the HMAC key. An empty or undecodable secret fails closed with
+  `InvalidSecret`.
+- Replay protection required: reject when `|now - webhook-timestamp| >
+  max_age` (default 300s, matching the reference libraries' tolerance)
 - Used by Svix, Clerk, Resend, and a growing list of adopters — implementing
   this once covers all of them.
 

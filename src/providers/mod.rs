@@ -9,6 +9,7 @@ mod github;
 mod linear;
 mod shopify;
 mod slack;
+mod standard_webhooks;
 mod stripe;
 
 use crate::core::VerifyOptions;
@@ -77,13 +78,15 @@ pub fn verify(
         Provider::Shopify => shopify::verify(headers, raw_body, secret, &options),
         Provider::Slack => slack::verify(headers, raw_body, secret, &options),
         Provider::Stripe => stripe::verify(headers, raw_body, secret, &options),
+        Provider::StandardWebhooks => {
+            standard_webhooks::verify(headers, raw_body, secret, &options)
+        }
         Provider::Square
         | Provider::Twilio
         | Provider::Discord
         | Provider::PayPal
         | Provider::SendGrid
         | Provider::Zoom
-        | Provider::Dropbox
-        | Provider::StandardWebhooks => Err(VerifyError::UnsupportedProvider),
+        | Provider::Dropbox => Err(VerifyError::UnsupportedProvider),
     }
 }

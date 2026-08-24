@@ -86,7 +86,7 @@ hand-copied signing-string logic to get wrong.
 | SendGrid | ECDSA (asymmetric) | 🚧 planned (blocked on spec §7) |
 | Zoom | HMAC-SHA256, `v0=` scheme | 🚧 planned |
 | Dropbox | HMAC-SHA256, `X-Dropbox-Signature` | 🚧 planned |
-| Standard Webhooks spec (Svix, Clerk, Resend, ...) | HMAC-SHA256, `webhook-signature` | 🚧 planned |
+| Standard Webhooks spec (Svix, Clerk, Resend, ...) | HMAC-SHA256, `webhook-signature` (`v1,` base64, rotation list) + replay window | ✅ |
 | Custom | User-supplied HMAC scheme via `Provider::Custom(..)` | 🚧 planned |
 
 Providers marked 🚧 exist as fail-closed variants of the `Provider` enum:
