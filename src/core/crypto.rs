@@ -7,11 +7,12 @@
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use hmac::{Hmac, KeyInit, Mac};
 use sha1::Sha1;
-use sha2::Sha256;
+use sha2::{Sha256, Sha512};
 use subtle::ConstantTimeEq;
 
 type HmacSha256 = Hmac<Sha256>;
 type HmacSha1 = Hmac<Sha1>;
+type HmacSha512 = Hmac<Sha512>;
 
 /// Ed25519 public-key length in bytes (compressed Edwards point).
 const ED25519_KEY_LEN: usize = 32;
@@ -61,6 +62,26 @@ pub(crate) fn verify_hmac_sha1(
     expected.as_slice().ct_eq(provided_signature).into()
 }
 
+/// Verifies `provided_signature` against HMAC-SHA512(`key`, `signed_string`)
+/// using a constant-time comparison.
+///
+/// Same guarantees as [`verify_hmac_sha256`]. Used by [`crate::CustomScheme`]
+/// (`spec.md` §2.2), whose `HashAlg::Sha512` option covers long-tail senders
+/// standardizing on SHA-512 HMACs.
+pub(crate) fn verify_hmac_sha512(
+    key: &[u8],
+    signed_string: &[u8],
+    provided_signature: &[u8],
+) -> bool {
+    let mut mac = match HmacSha512::new_from_slice(key) {
+        Ok(mac) => mac,
+        Err(_) => return false,
+    };
+    mac.update(signed_string);
+    let expected = mac.finalize().into_bytes();
+    expected.as_slice().ct_eq(provided_signature).into()
+}
+
 /// Verifies an Ed25519 `signature` over `message` against a 32-byte
 /// compressed Edwards public key.
 ///
@@ -97,7 +118,7 @@ pub(crate) fn verify_ed25519(public_key: &[u8], message: &[u8], signature: &[u8]
 
 #[cfg(test)]
 mod tests {
-    use super::{verify_ed25519, verify_hmac_sha1, verify_hmac_sha256};
+    use super::{verify_ed25519, verify_hmac_sha1, verify_hmac_sha256, verify_hmac_sha512};
 
     /// Decodes a hardcoded vector; keeps the crate-wide
     /// `clippy::unwrap_used`/`expect_used` denials intact in tests too.
@@ -164,6 +185,34 @@ mod tests {
             b"Jefe",
             b"what do ya want for nothing?",
             &sig[..19]
+        ));
+    }
+
+    #[test]
+    fn hmac_sha512_matches_rfc4231_vector() {
+        // RFC 4231 test case 2: key "Jefe", data "what do ya want for nothing?"
+        let sig = decode("164b7a7bfcf819e2e395fbe73b56e0a387bd64222e831fd610270cd7ea2505549758bf75c05a994a6d034f65f8f0e6fdcaeab1a34d4a6b4b636e070a38bce737");
+        assert!(verify_hmac_sha512(
+            b"Jefe",
+            b"what do ya want for nothing?",
+            &sig
+        ));
+    }
+
+    #[test]
+    fn hmac_sha512_rejects_tampered_and_wrong_length() {
+        let sig = decode("164b7a7bfcf819e2e395fbe73b56e0a387bd64222e831fd610270cd7ea2505549758bf75c05a994a6d034f65f8f0e6fdcaeab1a34d4a6b4b636e070a38bce737");
+        let mut flipped = sig.clone();
+        flipped[0] ^= 0x01;
+        assert!(!verify_hmac_sha512(
+            b"Jefe",
+            b"what do ya want for nothing?",
+            &flipped
+        ));
+        assert!(!verify_hmac_sha512(
+            b"Jefe",
+            b"what do ya want for nothing?",
+            &sig[..63]
         ));
     }
 

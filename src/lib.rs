@@ -50,4 +50,4 @@ mod core;
 mod providers;
 
 pub use crate::core::{Clock, HeaderMap, Secret, SystemClock, VerifyError, VerifyOptions};
-pub use crate::providers::{Provider, verify};
+pub use crate::providers::{CustomScheme, Encoding, HashAlg, Provider, verify};
