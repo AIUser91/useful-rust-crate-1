@@ -21,6 +21,15 @@ use std::collections::BTreeMap;
 /// For [`BTreeMap`] the inherent exact-case `get` shadows this trait method in
 /// method-call position. Pass the map to `HeaderMap::get(&map, name)` to get
 /// the case-insensitive lookup this crate relies on.
+///
+/// # `http::HeaderMap` support
+///
+/// Behind the `http` feature this trait is implemented for
+/// `http::HeaderMap`, so requests from any framework built on the `http`
+/// crate (axum, tower, hyper) verify without copying headers. Lookup uses
+/// that type's own first-value-wins, case-insensitive semantics; a value
+/// containing bytes that are not valid header content is reported as absent,
+/// which fails closed downstream as a missing header.
 pub trait HeaderMap {
     /// Case-insensitive lookup of a single header value.
     fn get(&self, name: &str) -> Option<&str>;
@@ -57,6 +66,21 @@ impl HeaderMap for BTreeMap<String, String> {
         self.iter()
             .find(|(k, _)| k.eq_ignore_ascii_case(name))
             .map(|(_, v)| v.as_str())
+    }
+}
+
+#[cfg(feature = "http")]
+impl HeaderMap for ::http::HeaderMap {
+    fn get(&self, name: &str) -> Option<&str> {
+        // `HeaderName::from_bytes` normalizes to lowercase and rejects names
+        // with invalid bytes, so an unparseable lookup name is simply a miss.
+        // The inherent `get` (reached via UFCS with the typed key) is
+        // case-insensitive per HTTP semantics and returns the first value
+        // when several are present. Duplicate *detection* stays the
+        // adapter's job — see the trait's ambiguity contract.
+        let key = ::http::header::HeaderName::from_bytes(name.as_bytes()).ok()?;
+        let value = ::http::HeaderMap::get(self, &key)?;
+        value.to_str().ok()
     }
 }
 
@@ -97,5 +121,115 @@ mod tests {
     fn str_tuple_arrays_work() {
         let headers = [("X-Slack-Signature", "v0=ff")];
         assert_eq!(headers.get("x-slack-signature"), Some("v0=ff"));
+    }
+
+    // --- `http::HeaderMap` (feature = "http") ---------------------------------
+
+    #[cfg(feature = "http")]
+    mod http_header_map {
+        use super::HeaderMap;
+        use crate::{Provider, Secret, verify};
+
+        /// GitHub's documented example vector
+        /// (<https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries>),
+        /// same one used in the crate-level docs.
+        fn github_headers() -> ::http::HeaderMap {
+            let mut headers = ::http::HeaderMap::new();
+            headers.insert(
+                "X-Hub-Signature-256",
+                ::http::HeaderValue::from_static(
+                    "sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17",
+                ),
+            );
+            headers
+        }
+
+        #[test]
+        fn lookup_is_ascii_case_insensitive() {
+            let headers = github_headers();
+            assert_eq!(
+                HeaderMap::get(&headers, "x-hub-signature-256"),
+                Some("sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17")
+            );
+            assert_eq!(
+                HeaderMap::get(&headers, "X-HUB-SIGNATURE-256"),
+                Some("sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17")
+            );
+            assert_eq!(headers.get("x-hub-signature-1"), None);
+        }
+
+        #[test]
+        fn first_value_wins_for_multivalued_headers() {
+            let mut headers = ::http::HeaderMap::new();
+            headers.append("X-Slack-Signature", ::http::HeaderValue::from_static("v0=first"));
+            headers.append("X-Slack-Signature", ::http::HeaderValue::from_static("v0=second"));
+            assert_eq!(
+                HeaderMap::get(&headers, "X-Slack-Signature"),
+                Some("v0=first")
+            );
+        }
+
+        #[test]
+        fn unparseable_lookup_name_is_a_miss_not_a_panic() {
+            let headers = github_headers();
+            // Invalid header-name bytes must yield `None`, never panic.
+            assert_eq!(HeaderMap::get(&headers, "bad name\n"), None);
+            assert_eq!(HeaderMap::get(&headers, ""), None);
+        }
+
+        #[test]
+        fn non_visible_ascii_value_is_reported_absent() {
+            let mut headers = ::http::HeaderMap::new();
+            // The `http` crate permits opaque bytes >= 0x80 in header values,
+            // so such values are reachable in practice (e.g. hand-built
+            // maps); `to_str` rejects them, and we surface that as absent
+            // rather than panicking or silently matching.
+            let Ok(value) = ::http::HeaderValue::from_bytes(&[0xFF]) else {
+                panic!("0xFF is a permitted header-value byte");
+            };
+            headers.insert("X-Webhook-Sig", value);
+            assert_eq!(HeaderMap::get(&headers, "X-Webhook-Sig"), None);
+        }
+
+        /// End-to-end: a real provider verifies straight against an
+        /// `http::HeaderMap` with no header copying.
+        #[test]
+        fn verifies_github_delivery_end_to_end() {
+            let result = verify(
+                Provider::GitHub,
+                &github_headers(),
+                b"Hello, World!",
+                &Secret::new("It's a Secret to Everybody"),
+                Default::default(),
+            );
+            assert_eq!(result, Ok(()));
+
+            // And a tampered body fails closed through the same path.
+            let result = verify(
+                Provider::GitHub,
+                &github_headers(),
+                b"Hello, World?",
+                &Secret::new("It's a Secret to Everybody"),
+                Default::default(),
+            );
+            assert_eq!(result, Err(crate::VerifyError::SignatureMismatch));
+        }
+
+        #[test]
+        fn missing_header_surfaces_as_missing_header_error() {
+            let result = verify(
+                Provider::GitHub,
+                &::http::HeaderMap::new(),
+                b"Hello, World!",
+                &Secret::new("It's a Secret to Everybody"),
+                Default::default(),
+            );
+            assert_eq!(
+                result,
+                Err(crate::VerifyError::MissingHeader {
+                    header: "X-Hub-Signature-256"
+                })
+            );
+        }
     }
 }
