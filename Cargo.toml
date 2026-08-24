@@ -2,9 +2,12 @@
 name = "webhook-verify"
 version = "0.1.0"
 edition = "2024"
+# First release with edition 2024 support; verified by the CI matrix.
+rust-version = "1.85"
 description = "One function to verify inbound webhook signatures from major providers"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/AIUser91/useful-rust-crate-1"
+exclude = ["/fuzz"]
 
 [dependencies]
 base64 = "0.23.1"

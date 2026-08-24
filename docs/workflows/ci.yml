@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: test / clippy (${{ matrix.rust }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # MSRV 1.85 = first Rust release with edition 2024 support.
+        rust: [stable, beta, "1.85"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --all-features
+
+  clippy:
+    name: clippy (-D warnings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      # Stable-only on purpose: lint sets differ between toolchains, and the
+      # bar this repo holds itself to (AGENTS.md §6) is defined against stable.
+      - run: cargo clippy --all-features -- -D warnings
+
+  secret-leak-grep:
+    name: no secret material in logs/panics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # spec.md §6 / §4.3: the `Secret` type's redacted Debug/Display are the
+      # primary defense; this grep is the backstop. src/ must contain no
+      # printing or logging macros at all — if you genuinely need one, it goes
+      # behind #[cfg(test)] in test modules only, so extend the allowlist here
+      # deliberately rather than weakening src/.
+      - name: Fail on printing/logging macros in src/
+        run: |
+          if grep -RInE '(println|print|eprintln|eprint|dbg)!|(log|tracing)::' src/; then
+            echo "::error::printing/logging macro found in src/ — secret material must never reach logs or panics (spec.md §4.3)"
+            exit 1
+          fi
+
+  semver-checks:
+    name: semver-checks
+    runs-on: ubuntu-latest
+    # Informational until the first version publishes: cargo-semver-checks has
+    # no baseline to compare against for an unpublished crate. Flip this to
+    # blocking as part of the first release.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-semver-checks
+      - run: cargo semver-checks
