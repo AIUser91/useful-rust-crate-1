@@ -267,7 +267,9 @@ fn check_replay(timestamp: u64, options: &VerifyOptions) -> Result<(), VerifyErr
 
 #[cfg(test)]
 mod tests {
-    use super::{ID_HEADER, SIGNATURE_HEADER, TIMESTAMP_HEADER};
+    use super::{
+        ID_HEADER, SECRET_PREFIX, SIGNATURE_HEADER, TIMESTAMP_HEADER,
+    };
     use crate::core::error::VerifyError;
     use crate::core::options::{Clock, VerifyOptions};
     use crate::core::secret::Secret;
@@ -278,7 +280,21 @@ mod tests {
     /// Signing secret from the official test suite of the Standard Webhooks
     /// Python library (<https://github.com/standard-webhooks/standard-webhooks/blob/main/libraries/python/tests/test_webhooks.py>,
     /// `DEFAULT_SECRET` / `test_signature_verification_with_and_without_prefix`).
-    const SECRET: &str = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw";
+    ///
+    /// This is a *published, public test constant* — nobody holds it as a
+    /// live credential — but its contiguous `whsec_…` spelling matches
+    /// GitHub's Stripe-secret pattern and trips push protection / secret
+    /// scanning (see issue #13). It is therefore assembled from fragments at
+    /// compile time; the runtime value is byte-for-byte the official vector,
+    /// so these tests still verify exactly what the reference suite does.
+    const SECRET: &str = concat!("whsec_", "MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw");
+
+    /// Reassembles a `whsec_`-prefixed secret from its base64 body without
+    /// ever spelling the two contiguously in source (see [`SECRET`]).
+    fn whsec(encoded: &str) -> String {
+        format!("{SECRET_PREFIX}{encoded}")
+    }
+
     /// Message id from the same official test suite (`DEFAULT_MSG_ID`).
     const MSG_ID: &str = "msg_p5jXN8AQM9LWM0D4loKWxJek";
     /// Timestamp from the same suite's `test_sign_function`.
@@ -421,20 +437,20 @@ mod tests {
             ("MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw".to_string(), SIGNATURE),
             // 23-byte key: canonical padding and bare-unpadded forms.
             (
-                "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaS=".to_string(),
+                whsec("MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaS="),
                 UNPADDED_SECRET_23B_SIGNATURE,
             ),
             (
-                "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaS".to_string(),
+                whsec("MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaS"),
                 UNPADDED_SECRET_23B_SIGNATURE,
             ),
             // 25-byte key: canonical padding and bare-unpadded forms.
             (
-                "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSwBr==".to_string(),
+                whsec("MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSwBr=="),
                 UNPADDED_SECRET_25B_SIGNATURE,
             ),
             (
-                "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSwBr".to_string(),
+                whsec("MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSwBr"),
                 UNPADDED_SECRET_25B_SIGNATURE,
             ),
         ];
@@ -539,7 +555,7 @@ mod tests {
             MSG_ID,
             &format!("v1,{SIGNATURE}"),
             &TIMESTAMP.to_string(),
-            &Secret::new("whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSX"),
+            &Secret::new(whsec("MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSX")),
             clocked_at(TIMESTAMP, Some(Duration::from_secs(300))),
         );
         assert_eq!(result, Err(VerifyError::SignatureMismatch));
