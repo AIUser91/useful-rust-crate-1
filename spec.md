@@ -67,8 +67,13 @@ pub struct VerifyOptions {
     /// Clock used for "now", injectable for deterministic tests.
     pub clock: Option<Arc<dyn Clock>>,
     /// Full URL of the receiving endpoint, for URL-scoped schemes
-    /// (currently Square). See §3.
+    /// (currently Square, Twilio). See §3.
     pub request_url: Option<String>,
+    /// Parsed `application/x-www-form-urlencoded` fields, required by
+    /// schemes that sign form fields rather than the raw body
+    /// (currently Twilio). Pass every field as received; sorting into
+    /// signing order happens here. See §3.
+    pub form_params: Option<Vec<(String, String)>>,
 }
 
 impl Default for VerifyOptions {
@@ -219,8 +224,8 @@ Square's official SDKs (e.g. `square-python-sdk`
 - Header: `x-square-hmacsha256-signature: <base64_hmac>`
 - Signed string: `"{notification_url}{raw_body}"` — the webhook subscription's
   notification URL concatenated directly with the raw body, no separator.
-  This is the one shipped scheme where verification cannot proceed from
-  headers + body + secret alone, so the caller supplies the URL via
+  Verification cannot proceed from headers + body + secret alone, so the
+  caller supplies the URL via
   [`VerifyOptions::request_url`] (decided API shape; a missing or empty URL
   fails closed with `MissingContext`). The value must be the exact
   dashboard-configured constant — reconstructing it from request headers
@@ -236,13 +241,31 @@ Square's official SDKs (e.g. `square-python-sdk`
 
 ### Twilio
 
+Source: <https://www.twilio.com/docs/usage/security#validating-requests>
+("Validating requests are coming from Twilio", including the docs' own
+worked example) and the reference implementations in Twilio's official SDKs
+(e.g. `twilio-python`'s `twilio/request_validator.py`).
+
 - Header: `X-Twilio-Signature: <base64_hmac_sha1>`
-- Signed string: full request URL concatenated with sorted `POST` param
-  key+value pairs (form-encoded requests, not raw JSON)
-- Algorithm: HMAC-SHA1, base64-encoded
-- Note: this is the one scheme in the default set that is not purely
-  raw-body-based; it needs the full URL and parsed form fields. Implement
-  as its own code path, not shoehorned into the generic HMAC helper.
+- Signed string: the full request URL (protocol through query string,
+  exactly as configured with Twilio), followed by the `POST` form fields
+  sorted alphabetically by name in Unix-style byte order, each field's name
+  and value concatenated directly to the string with no delimiter.
+- Algorithm: HMAC-SHA1, base64-encoded. HMAC construction is not affected by
+  SHA-1's collision attacks given a secret key, which is why the scheme
+  remains SHA-1.
+- Key: the account's Auth Token as its UTF-8 bytes; an empty token fails
+  closed with `InvalidSecret`.
+- Not a raw-body scheme: the signature covers the parsed form fields, not
+  the body bytes. Callers pass every received field via
+  [`VerifyOptions::form_params`] (decided API shape; the URL goes in
+  `VerifyOptions::request_url`). Sorting is applied by this crate — callers
+  pass fields in any order. A duplicate field name keeps its received
+  relative order (the official SDKs use keyed dicts, which cannot represent
+  duplicates). Omitting either option fails closed with `MissingContext`.
+  An explicitly empty parameter list is meaningful (the JSON-body variant
+  carries a `bodySHA256` query parameter and signs the URL alone).
+- No timestamp in the signature scheme (`max_age` has no effect).
 
 ### Discord
 

@@ -2,14 +2,16 @@
 //!
 //! All HMAC construction and all constant-time comparison live here so the
 //! security guarantees are implemented once (`spec.md` §4). Providers must not
-//! call `hmac`/`sha2`/`subtle` directly; they call these helpers.
+//! call `hmac`/`sha2`/`sha1`/`subtle` directly; they call these helpers.
 
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use hmac::{Hmac, KeyInit, Mac};
+use sha1::Sha1;
 use sha2::Sha256;
 use subtle::ConstantTimeEq;
 
 type HmacSha256 = Hmac<Sha256>;
+type HmacSha1 = Hmac<Sha1>;
 
 /// Ed25519 public-key length in bytes (compressed Edwards point).
 const ED25519_KEY_LEN: usize = 32;
@@ -31,6 +33,26 @@ pub(crate) fn verify_hmac_sha256(
     provided_signature: &[u8],
 ) -> bool {
     let mut mac = match HmacSha256::new_from_slice(key) {
+        Ok(mac) => mac,
+        Err(_) => return false,
+    };
+    mac.update(signed_string);
+    let expected = mac.finalize().into_bytes();
+    expected.as_slice().ct_eq(provided_signature).into()
+}
+
+/// Verifies `provided_signature` against HMAC-SHA1(`key`, `signed_string`)
+/// using a constant-time comparison.
+///
+/// Same guarantees as [`verify_hmac_sha256`]. Used by Twilio's scheme, which
+/// mandates HMAC-SHA1 (`spec.md` §3); Twilio's own docs note HMAC is not
+/// affected by SHA-1's collision attacks given a secret key.
+pub(crate) fn verify_hmac_sha1(
+    key: &[u8],
+    signed_string: &[u8],
+    provided_signature: &[u8],
+) -> bool {
+    let mut mac = match HmacSha1::new_from_slice(key) {
         Ok(mac) => mac,
         Err(_) => return false,
     };
@@ -75,7 +97,7 @@ pub(crate) fn verify_ed25519(public_key: &[u8], message: &[u8], signature: &[u8]
 
 #[cfg(test)]
 mod tests {
-    use super::{verify_ed25519, verify_hmac_sha256};
+    use super::{verify_ed25519, verify_hmac_sha1, verify_hmac_sha256};
 
     /// Decodes a hardcoded vector; keeps the crate-wide
     /// `clippy::unwrap_used`/`expect_used` denials intact in tests too.
@@ -93,6 +115,17 @@ mod tests {
         let data = b"what do ya want for nothing?";
         let sig = decode("5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843");
         assert!(verify_hmac_sha256(key, data, &sig));
+    }
+
+    #[test]
+    fn hmac_sha1_matches_rfc2202_vector() {
+        // RFC 2202 test case 2: key "Jefe", data "what do ya want for nothing?"
+        let sig = decode("effcdf6ae5eb2fa2d27416d5f184df9c259a7c79");
+        assert!(verify_hmac_sha1(
+            b"Jefe",
+            b"what do ya want for nothing?",
+            &sig
+        ));
     }
 
     #[test]
@@ -114,6 +147,23 @@ mod tests {
             b"wrong key",
             b"what do ya want for nothing?",
             &sig
+        ));
+    }
+
+    #[test]
+    fn hmac_sha1_rejects_tampered_and_wrong_length() {
+        let sig = decode("effcdf6ae5eb2fa2d27416d5f184df9c259a7c79");
+        let mut flipped = sig.clone();
+        flipped[0] ^= 0x01;
+        assert!(!verify_hmac_sha1(
+            b"Jefe",
+            b"what do ya want for nothing?",
+            &flipped
+        ));
+        assert!(!verify_hmac_sha1(
+            b"Jefe",
+            b"what do ya want for nothing?",
+            &sig[..19]
         ));
     }
 

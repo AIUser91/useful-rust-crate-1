@@ -80,7 +80,7 @@ hand-copied signing-string logic to get wrong.
 | Slack | HMAC-SHA256 `v0=` scheme, `X-Slack-Signature` + timestamp | ✅ |
 | Linear | HMAC-SHA256, `linear-signature` | ✅ |
 | Square | HMAC-SHA256 over notification URL + body, base64, `X-Square-HmacSha256-Signature` (needs `VerifyOptions::request_url`) | ✅ |
-| Twilio | HMAC-SHA1 over URL + sorted params | 🚧 planned |
+| Twilio | HMAC-SHA1 over URL + sorted form params, `X-Twilio-Signature` (needs `VerifyOptions::request_url` + `form_params`) | ✅ |
 | Discord | Ed25519 (public-key), no shared secret | ✅ |
 | PayPal | Certificate-based / API verification | 🚧 planned (blocked on spec §7) |
 | SendGrid | ECDSA (asymmetric) | 🚧 planned (blocked on spec §7) |

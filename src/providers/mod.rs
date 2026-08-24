@@ -13,6 +13,7 @@ mod slack;
 mod square;
 mod standard_webhooks;
 mod stripe;
+mod twilio;
 
 use crate::core::VerifyOptions;
 use crate::core::error::VerifyError;
@@ -35,9 +36,10 @@ pub enum Provider {
     Shopify,
     /// Slack (`X-Slack-Signature`, `v0=` scheme with timestamp).
     Slack,
-    /// Square (HMAC-SHA256 over notification URL + body, hex-decoded key).
+    /// Square (HMAC-SHA256 over notification URL + body, base64).
     Square,
-    /// Twilio (HMAC-SHA1 over full URL + sorted form params).
+    /// Twilio (HMAC-SHA1 over full URL + sorted form params; needs
+    /// `VerifyOptions::request_url` and `VerifyOptions::form_params`).
     Twilio,
     /// Discord (Ed25519 public-key signatures; `Secret` holds a public key).
     ///
@@ -89,8 +91,8 @@ pub fn verify(
         Provider::StandardWebhooks => {
             standard_webhooks::verify(headers, raw_body, secret, &options)
         }
-        Provider::Twilio
-        | Provider::PayPal
+        Provider::Twilio => twilio::verify(headers, raw_body, secret, &options),
+        Provider::PayPal
         | Provider::SendGrid
         | Provider::Zoom
         | Provider::Dropbox => Err(VerifyError::UnsupportedProvider),

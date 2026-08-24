@@ -221,6 +221,7 @@ mod tests {
             max_age,
             clock: Some(Arc::new(FixedClock(epoch(secs)))),
             request_url: None,
+            form_params: None,
         }
     }
 
