@@ -28,8 +28,9 @@ use std::collections::BTreeMap;
 /// `http::HeaderMap`, so requests from any framework built on the `http`
 /// crate (axum, tower, hyper) verify without copying headers. Lookup uses
 /// that type's own first-value-wins, case-insensitive semantics; a value
-/// containing bytes that are not valid header content is reported as absent,
-/// which fails closed downstream as a missing header.
+/// that is not visible ASCII (which `http` permits but this crate cannot
+/// treat as a signature) is reported as absent, failing closed downstream
+/// as a missing header.
 pub trait HeaderMap {
     /// Case-insensitive lookup of a single header value.
     fn get(&self, name: &str) -> Option<&str>;
