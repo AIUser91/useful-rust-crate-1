@@ -301,11 +301,12 @@ Discord's official SDKs (`discord-interactions-js`,
 ### PayPal / SendGrid
 
 - Both use asymmetric (certificate/ECDSA-based) verification requiring a
-  fetched or configured public key/certificate rather than a bare shared
-  secret. v0.1 ships these as documented `CustomScheme` recipes plus tested
-  helper functions, promoted to first-class `Provider` variants once the
-  certificate-fetch story (sync vs. pluggable async fetcher) is settled —
-  see open questions (§7).
+  configured public key/certificate rather than a bare shared secret. The
+  certificate-fetch design question is now resolved (§7): these crates
+  never fetch key material themselves — the caller supplies it via
+  `VerifyOptions::verifying_material`. Until first-class implementations
+  land, both remain available as documented `CustomScheme` recipes plus
+  tested helper functions.
 
 ### Linear / Zoom / Dropbox
 
@@ -416,12 +417,61 @@ A provider implementation is not mergeable until it has:
 
 ## 7. Open questions / future work
 
-- **Certificate/public-key providers (PayPal, SendGrid).** Should the crate
-  fetch certificates itself (requires an async HTTP client dependency,
-  against the "no network calls" goal) or only accept a pre-fetched
-  key/cert from the caller? Current lean: caller-supplied only, with a
-  separate optional `webhook-verify-fetch` companion crate later if there's
-  demand for automated key rotation handling.
+- **Certificate/public-key providers (PayPal, SendGrid).** *Resolved
+  (2026-08): caller-supplied key material only.* The crate never performs
+  network I/O — certificate fetching, URL allow-listing, and caching stay
+  with the caller. Rationale:
+  1. A fetcher inside `verify()` breaks two §1 goals at once ("no network
+     calls", "no required async runtime") and makes the security-critical
+     path impure and much harder to audit.
+  2. Trusting a cert URL is a deployment-specific decision (PayPal's
+     `Paypal-Cert-Url` must be validated against the caller's own
+     allowlist before use). Getting it wrong silently weakens verification
+     more thoroughly than any crypto bug; the crate should not make that
+     choice on callers' behalf.
+  3. A synchronous fetcher would drag in blocking HTTP + TLS dependencies;
+     an async one would force a runtime choice on all users.
+
+  API sketch for the implementation PRs:
+
+  ```rust
+  /// Caller-supplied asymmetric verification material (spec §7).
+  pub enum VerifyingKeyMaterial {
+      /// DER- or PEM-encoded X.509 certificate (PayPal). Only the embedded
+      /// public key is used; this crate performs no chain validation, so
+      /// callers needing chain/pin enforcement supply an already-validated
+      /// certificate.
+      X509Certificate(Vec<u8>),
+      /// Raw bytes of an ECDSA P-256 public key (SendGrid), decoded by the
+      /// caller from its published base64 form.
+      EcdsaP256PublicKey(Vec<u8>),
+  }
+
+  pub struct VerifyOptions {
+      // ... existing fields ...
+      /// Verification material for providers whose scheme checks a
+      /// signature against a configured public key/certificate rather
+      /// than a shared secret (currently PayPal, SendGrid). This crate
+      /// never fetches anything from the network.
+      pub verifying_material: Option<VerifyingKeyMaterial>,
+  }
+  ```
+
+  Error semantics follow existing conventions: required-but-absent
+  `verifying_material` fails closed with `MissingContext` (caller
+  misconfiguration, mirroring Square/Twilio); malformed material (bad
+  PEM/DER, wrong length) with `InvalidSecret`; header problems with the
+  usual `MissingHeader`/`MalformedHeader`; everything else is
+  `SignatureMismatch`.
+
+  Implementation notes for the follow-up PRs: exact per-provider signed-
+  string constructions must be pinned against official sources and added
+  as §3 rows in the same PR as the code (repo policy); asymmetric
+  verification will need feature-gated RustCrypto dependencies (`rsa`,
+  `p256`) justified per AGENTS.md. The optional `webhook-verify-fetch`
+  companion crate remains future work if automated key rotation handling
+  is ever requested — it stays out of this crate either way.
+
 - **Secret rotation UX.** Stripe/Standard Webhooks allow multiple valid
   signatures during a rotation window (`v1=...,v1=...`). Should `verify()`
   accept a single `Secret` or `&[Secret]` generically across all providers?
