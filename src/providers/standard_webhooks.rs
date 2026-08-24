@@ -741,7 +741,7 @@ mod tests {
             ),
             (
                 // A bare `v1,` element with nothing after the comma.
-                format!("v1,"),
+                "v1,".to_string(),
                 VerifyError::MalformedHeader {
                     header: SIGNATURE_HEADER,
                     reason: "empty signature after `v1,` prefix",

@@ -474,7 +474,7 @@ mod tests {
                 },
             ),
             (
-                format!("v0="),
+                "v0=".to_string(),
                 VerifyError::MalformedHeader {
                     header: SIGNATURE_HEADER,
                     reason: "empty signature after `v0=` prefix",

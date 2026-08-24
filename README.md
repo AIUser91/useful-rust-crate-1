@@ -81,7 +81,7 @@ hand-copied signing-string logic to get wrong.
 | Linear | HMAC-SHA256, `linear-signature` | ✅ |
 | Square | HMAC-SHA256, hex secret | 🚧 planned |
 | Twilio | HMAC-SHA1 over URL + sorted params | 🚧 planned |
-| Discord | Ed25519 (public-key), no shared secret | 🚧 planned |
+| Discord | Ed25519 (public-key), no shared secret | ✅ |
 | PayPal | Certificate-based / API verification | 🚧 planned (blocked on spec §7) |
 | SendGrid | ECDSA (asymmetric) | 🚧 planned (blocked on spec §7) |
 | Zoom | HMAC-SHA256, `v0=` scheme | 🚧 planned |
