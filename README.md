@@ -100,9 +100,15 @@ names, and encoding for each provider, and the process for adding new ones.
 [dependencies]
 webhook-verify = "0.1"
 
+# verify straight against http::HeaderMap (axum, tower, hyper, ...)
+webhook-verify = { version = "0.1", features = ["http"] }
+
 # optional framework adapters
 webhook-verify = { version = "0.1", features = ["axum"] }
 ```
+
+With the `http` feature enabled, any `http::HeaderMap` (from axum, tower, or
+hyper requests) implements `HeaderMap` and can be passed to `verify()` directly.
 
 ## Framework adapters
 
