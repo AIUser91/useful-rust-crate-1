@@ -28,6 +28,9 @@ const IMPLEMENTED: &[Provider] = &[
     // Discord's secret is a hex public key; the arbitrary-secret loop below
     // exercises its InvalidSecret decoding paths too.
     Provider::Discord,
+    // Twilio is exercised separately below: it needs form-param context to
+    // reach its signature path, and ignores the raw body by design.
+    Provider::Twilio,
 ];
 
 /// A well-formed secret for each provider's scheme, so the fuzzer reaches the
@@ -73,11 +76,23 @@ fuzz_target!(|data: &[u8]| {
     let url_scoped_options =
         VerifyOptions::default().with_request_url("https://example.com/webhook");
 
+    // Twilio additionally needs parsed form params; arbitrary field bytes
+    // exercise its signed-string construction and base64 parsing paths.
+    let twilio_options = VerifyOptions::default()
+        .with_request_url("https://example.com/webhook")
+        .with_form_params([
+            ("CallSid", "CA1234567890ABCDE"),
+            ("Digits", "1234"),
+            ("From", "+14158675310"),
+        ]);
+
     // Fail-closed dispatch for not-yet-implemented variants must also never
     // panic (Square now has an implementation; it is exercised via
     // IMPLEMENTED below, with and without its required URL context).
     attempt(Provider::Square, &headers, body, WELL_FORMED_SECRET, &url_scoped_options);
     attempt(Provider::Square, &headers, body, WELL_FORMED_SECRET, &VerifyOptions::default());
+    attempt(Provider::Twilio, &headers, body, WELL_FORMED_SECRET, &twilio_options);
+    attempt(Provider::Twilio, &headers, body, WELL_FORMED_SECRET, &VerifyOptions::default());
 
     for &provider in IMPLEMENTED {
         attempt(provider, &headers, body, WELL_FORMED_SECRET, &url_scoped_options);

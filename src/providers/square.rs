@@ -280,6 +280,7 @@ mod tests {
             max_age: Some(Duration::ZERO),
             clock: None,
             request_url: Some(OFFICIAL_URL.to_string()),
+            form_params: None,
         };
         let result = verify(
             crate::Provider::Square,
