@@ -37,6 +37,17 @@ pub struct VerifyOptions {
     /// Clock used for "now". `None` means real system time. Injectable for
     /// deterministic tests of timestamp-based providers.
     pub clock: Option<Arc<dyn Clock>>,
+    /// Full URL of the receiving endpoint, required by providers whose
+    /// signature incorporates it (currently Square, whose scheme signs the
+    /// notification URL followed by the raw body). The value must match the
+    /// URL configured with the provider **exactly** — a differing trailing
+    /// slash or scheme makes every signature fail. Providers whose scheme
+    /// does not sign the URL document that this option has no effect on them.
+    ///
+    /// Supplying the configured constant from the provider dashboard is the
+    /// intended use; reconstructing the URL from request headers behind a
+    /// proxy is a common source of verification failures.
+    pub request_url: Option<String>,
 }
 
 impl Default for VerifyOptions {
@@ -44,11 +55,19 @@ impl Default for VerifyOptions {
         Self {
             max_age: Some(Duration::from_secs(300)),
             clock: None,
+            request_url: None,
         }
     }
 }
 
 impl VerifyOptions {
+    /// Sets [`VerifyOptions::request_url`], for URL-scoped schemes.
+    #[must_use]
+    pub fn with_request_url(mut self, url: impl Into<String>) -> Self {
+        self.request_url = Some(url.into());
+        self
+    }
+
     /// Resolves "now" from the injected clock, falling back to system time.
     #[must_use]
     pub fn now(&self) -> SystemTime {
@@ -64,6 +83,7 @@ impl fmt::Debug for VerifyOptions {
         f.debug_struct("VerifyOptions")
             .field("max_age", &self.max_age)
             .field("clock", &self.clock.as_ref().map(|_| "<injected>"))
+            .field("request_url_set", &self.request_url.is_some())
             .finish()
     }
 }
@@ -97,7 +117,23 @@ mod tests {
         let opts = VerifyOptions {
             max_age: Some(Duration::from_secs(300)),
             clock: Some(Arc::new(FixedClock(fixed))),
+            request_url: None,
         };
         assert_eq!(opts.now(), fixed);
+    }
+
+    #[test]
+    fn builder_sets_request_url() {
+        let opts = VerifyOptions::default().with_request_url("https://example.com/webhook");
+        assert_eq!(
+            opts.request_url.as_deref(),
+            Some("https://example.com/webhook")
+        );
+    }
+
+    #[test]
+    fn debug_does_not_print_request_url_value() {
+        let opts = VerifyOptions::default().with_request_url("https://internal.example/hook");
+        assert!(!format!("{opts:?}").contains("internal.example"));
     }
 }

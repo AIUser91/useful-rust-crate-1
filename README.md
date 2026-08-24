@@ -79,7 +79,7 @@ hand-copied signing-string logic to get wrong.
 | Shopify | HMAC-SHA256, base64, `X-Shopify-Hmac-Sha256` | ✅ |
 | Slack | HMAC-SHA256 `v0=` scheme, `X-Slack-Signature` + timestamp | ✅ |
 | Linear | HMAC-SHA256, `linear-signature` | ✅ |
-| Square | HMAC-SHA256, hex secret | 🚧 planned |
+| Square | HMAC-SHA256 over notification URL + body, base64, `X-Square-HmacSha256-Signature` (needs `VerifyOptions::request_url`) | ✅ |
 | Twilio | HMAC-SHA1 over URL + sorted params | 🚧 planned |
 | Discord | Ed25519 (public-key), no shared secret | ✅ |
 | PayPal | Certificate-based / API verification | 🚧 planned (blocked on spec §7) |

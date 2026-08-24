@@ -254,6 +254,7 @@ mod tests {
         VerifyOptions {
             max_age,
             clock: Some(Arc::new(FixedClock(epoch(secs)))),
+            request_url: None,
         }
     }
 

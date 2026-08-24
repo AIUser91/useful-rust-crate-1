@@ -56,6 +56,15 @@ pub enum VerifyError {
         /// Static description of why the secret was rejected.
         reason: &'static str,
     },
+    /// Verification for this provider requires caller-supplied request
+    /// context (such as Square's notification URL, via
+    /// [`crate::VerifyOptions::request_url`]) that was not provided. This is
+    /// an operator misconfiguration, not an attack signal — but the request
+    /// is still rejected: fail closed.
+    MissingContext {
+        /// Static description of what context was missing.
+        reason: &'static str,
+    },
 }
 
 impl fmt::Display for VerifyError {
@@ -75,6 +84,9 @@ impl fmt::Display for VerifyError {
             ),
             VerifyError::UnsupportedProvider => write!(f, "provider not implemented yet"),
             VerifyError::InvalidSecret { reason } => write!(f, "invalid secret: {reason}"),
+            VerifyError::MissingContext { reason } => {
+                write!(f, "missing verification context: {reason}")
+            }
         }
     }
 }
