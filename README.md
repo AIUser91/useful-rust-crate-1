@@ -82,8 +82,8 @@ hand-copied signing-string logic to get wrong.
 | Square | HMAC-SHA256 over notification URL + body, base64, `X-Square-HmacSha256-Signature` (needs `VerifyOptions::request_url`) | ✅ |
 | Twilio | HMAC-SHA1 over URL + sorted form params, `X-Twilio-Signature` (needs `VerifyOptions::request_url` + `form_params`) | ✅ |
 | Discord | Ed25519 (public-key), no shared secret | ✅ |
-| PayPal | Certificate-based / API verification | 🚧 planned (blocked on spec §7) |
-| SendGrid | ECDSA (asymmetric) | 🚧 planned (blocked on spec §7) |
+| PayPal | Certificate-based / API verification | 🚧 planned (design settled, spec §7) |
+| SendGrid | ECDSA (asymmetric) | 🚧 planned (design settled, spec §7) |
 | Zoom | HMAC-SHA256, `v0=` scheme | 🚧 planned |
 | Dropbox | HMAC-SHA256, `X-Dropbox-Signature` | 🚧 planned |
 | Standard Webhooks spec (Svix, Clerk, Resend, ...) | HMAC-SHA256, `webhook-signature` (`v1,` base64, rotation list) + replay window | ✅ |
