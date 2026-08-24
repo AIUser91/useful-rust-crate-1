@@ -103,8 +103,13 @@ Implementation status (kept in sync with the code — do not let this drift):
 - All `Provider` variants ship up front so adding providers later is
   non-breaking. A variant without an implementation yet fails closed:
   `verify()` returns `UnsupportedProvider` for it.
-- `Custom(CustomScheme)` is **not** in the shipped enum yet; §2.2 is the
-  design it will be implemented against.
+- `Custom(CustomScheme)` ships per §2.2: declarative hash/encoding/prefix/
+  header configuration plus a caller-supplied signed-string function, with
+  the same constant-time comparison and fail-closed parsing guarantees as
+  built-in providers. When `timestamp_header` is set, replay protection
+  applies with the shared symmetric tolerance semantics (`|now - t| <=
+  max_age`) used by the built-in timestamped schemes; when it is `None`,
+  no clock is consulted (mirroring GitHub/Linear).
 
 ### 2.1 `VerifyError`
 

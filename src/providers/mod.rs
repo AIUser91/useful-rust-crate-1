@@ -5,6 +5,7 @@
 //! vectors. Providers without an implementation yet fail closed with
 //! [`VerifyError::UnsupportedProvider`].
 
+mod custom;
 mod discord;
 mod github;
 mod linear;
@@ -14,6 +15,8 @@ mod square;
 mod standard_webhooks;
 mod stripe;
 mod twilio;
+
+pub use custom::{CustomScheme, Encoding, HashAlg};
 
 use crate::core::VerifyOptions;
 use crate::core::error::VerifyError;
@@ -59,6 +62,11 @@ pub enum Provider {
     Dropbox,
     /// Standard Webhooks spec (`webhook-*` headers; Svix, Clerk, Resend, ...).
     StandardWebhooks,
+    /// A caller-configured HMAC scheme (`spec.md` §2.2): covers long-tail
+    /// providers and internal senders without waiting on a crate release,
+    /// with the same constant-time and fail-closed guarantees as the
+    /// built-ins. See [`CustomScheme`].
+    Custom(CustomScheme),
 }
 
 /// Verifies that a webhook request was sent by `provider` and was not tampered
@@ -92,9 +100,9 @@ pub fn verify(
             standard_webhooks::verify(headers, raw_body, secret, &options)
         }
         Provider::Twilio => twilio::verify(headers, raw_body, secret, &options),
-        Provider::PayPal
-        | Provider::SendGrid
-        | Provider::Zoom
-        | Provider::Dropbox => Err(VerifyError::UnsupportedProvider),
+        Provider::Custom(scheme) => custom::verify(&scheme, headers, raw_body, secret, &options),
+        Provider::PayPal | Provider::SendGrid | Provider::Zoom | Provider::Dropbox => {
+            Err(VerifyError::UnsupportedProvider)
+        }
     }
 }

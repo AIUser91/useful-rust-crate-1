@@ -87,7 +87,7 @@ hand-copied signing-string logic to get wrong.
 | Zoom | HMAC-SHA256, `v0=` scheme | 🚧 planned |
 | Dropbox | HMAC-SHA256, `X-Dropbox-Signature` | 🚧 planned |
 | Standard Webhooks spec (Svix, Clerk, Resend, ...) | HMAC-SHA256, `webhook-signature` (`v1,` base64, rotation list) + replay window | ✅ |
-| Custom | User-supplied HMAC scheme via `Provider::Custom(..)` | 🚧 planned |
+| Custom | User-supplied HMAC scheme via `Provider::Custom(..)` (SHA-256/SHA-1/SHA-512, hex/base64, optional prefix + timestamp replay window) | ✅ |
 
 Providers marked 🚧 exist as fail-closed variants of the `Provider` enum:
 passing one to `verify()` returns `VerifyError::UnsupportedProvider`. See

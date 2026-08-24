@@ -7,7 +7,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use webhook_verify::{Provider, Secret, VerifyOptions};
+use webhook_verify::{CustomScheme, Encoding, HashAlg, Provider, Secret, VerifyOptions};
 
 /// Upper bound on parsed header lines so a pathological input cannot spin the
 /// loop long enough to trip the fuzzer's timeout.
@@ -93,6 +93,52 @@ fuzz_target!(|data: &[u8]| {
     attempt(Provider::Square, &headers, body, WELL_FORMED_SECRET, &VerifyOptions::default());
     attempt(Provider::Twilio, &headers, body, WELL_FORMED_SECRET, &twilio_options);
     attempt(Provider::Twilio, &headers, body, WELL_FORMED_SECRET, &VerifyOptions::default());
+
+    // CustomScheme (spec §2.2): a Slack-shaped configuration exercises the
+    // prefix-strip, hex-decode, timestamp-parse, and user signed-string
+    // paths with arbitrary bytes; the raw-body/base64 variant covers the
+    // remaining encoding/algorithm combinations.
+    let slack_like = CustomScheme {
+        hash: HashAlg::Sha256,
+        signature_header: "X-Slack-Signature",
+        timestamp_header: Some("X-Slack-Request-Timestamp"),
+        encoding: Encoding::Hex,
+        prefix: Some("v0="),
+        signed_string: |headers, raw_body| {
+            let ts = headers.get("X-Slack-Request-Timestamp").unwrap_or_default();
+            let mut signed = Vec::with_capacity(3 + ts.len() + 1 + raw_body.len());
+            signed.extend_from_slice(b"v0:");
+            signed.extend_from_slice(ts.as_bytes());
+            signed.push(b':');
+            signed.extend_from_slice(raw_body);
+            signed
+        },
+    };
+    attempt(
+        Provider::Custom(slack_like),
+        &headers,
+        body,
+        "fuzz-signing-secret",
+        &VerifyOptions::default(),
+    );
+
+    let raw_b64 = |hash| CustomScheme {
+        hash,
+        signature_header: "X-Raw-Sig",
+        timestamp_header: None,
+        encoding: Encoding::Base64,
+        prefix: None,
+        signed_string: |_headers, raw_body| raw_body.to_vec(),
+    };
+    for hash in [HashAlg::Sha256, HashAlg::Sha1, HashAlg::Sha512] {
+        attempt(
+            Provider::Custom(raw_b64(hash)),
+            &headers,
+            body,
+            "fuzz-signing-secret",
+            &url_scoped_options.clone(),
+        );
+    }
 
     for &provider in IMPLEMENTED {
         attempt(provider, &headers, body, WELL_FORMED_SECRET, &url_scoped_options);
