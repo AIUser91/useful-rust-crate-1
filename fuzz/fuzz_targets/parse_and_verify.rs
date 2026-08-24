@@ -22,6 +22,9 @@ const IMPLEMENTED: &[Provider] = &[
     Provider::Slack,
     Provider::Linear,
     Provider::StandardWebhooks,
+    // Discord's secret is a hex public key; the arbitrary-secret loop below
+    // exercises its InvalidSecret decoding paths too.
+    Provider::Discord,
 ];
 
 /// A well-formed secret for each provider's scheme, so the fuzzer reaches the
@@ -64,7 +67,7 @@ fuzz_target!(|data: &[u8]| {
 
     // Fail-closed dispatch for not-yet-implemented variants must also never
     // panic.
-    attempt(Provider::Discord, &headers, body, WELL_FORMED_SECRET);
+    attempt(Provider::Square, &headers, body, WELL_FORMED_SECRET);
 
     for &provider in IMPLEMENTED {
         attempt(provider, &headers, body, WELL_FORMED_SECRET);

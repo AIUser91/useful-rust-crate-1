@@ -221,12 +221,29 @@ body, multi-value headers, etc.).
 
 ### Discord
 
+Source: <https://docs.discord.com/developers/interactions/overview>
+("Validating Security Request Headers") and the reference implementations in
+Discord's official SDKs (`discord-interactions-js`,
+`discord-interactions-python`).
+
 - Headers: `X-Signature-Ed25519`, `X-Signature-Timestamp`
-- Signed message: `"{timestamp}{raw_body}"`
+- Signed message: `"{timestamp}{raw_body}"` — the timestamp verbatim from
+  its header, immediately followed by the raw body bytes
 - Algorithm: Ed25519 signature verification against Discord's provided
   **public key** (not a shared secret — `Secret` here holds the hex-encoded
   public key, not an HMAC key; document this distinction prominently since
-  it changes the security model).
+  it changes the security model). Malformed keys (non-hex, wrong length)
+  fail closed with `InvalidSecret`.
+- Replay protection: enforced with the shared default tolerance
+  (symmetric `|now - t| <= max_age`). Discord's docs define no recommended
+  window; the timestamp exists so receivers *can* reject stale deliveries,
+  and spec §5.4 requires a tolerance for timestamped schemes. Callers can
+  widen or disable via `max_age`.
+- Test vectors: Discord publishes no frozen vectors today (their SDK tests
+  generate ephemeral keypairs; the docs show placeholder keys). The
+  implementation is validated against locally constructed, deterministic
+  vectors over exactly the officially documented construction. Replace them
+  if Discord ever publishes fixed vectors.
 
 ### PayPal / SendGrid
 

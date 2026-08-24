@@ -5,6 +5,7 @@
 //! vectors. Providers without an implementation yet fail closed with
 //! [`VerifyError::UnsupportedProvider`].
 
+mod discord;
 mod github;
 mod linear;
 mod shopify;
@@ -38,6 +39,10 @@ pub enum Provider {
     /// Twilio (HMAC-SHA1 over full URL + sorted form params).
     Twilio,
     /// Discord (Ed25519 public-key signatures; `Secret` holds a public key).
+    ///
+    /// Unlike the shared-secret schemes, verification here proves the payload
+    /// was signed with the private key corresponding to the *public* key in
+    /// [`crate::Secret`] — see the provider module's security-model notes.
     Discord,
     /// PayPal (certificate-based; see `spec.md` §7 open questions).
     PayPal,
@@ -73,6 +78,7 @@ pub fn verify(
     options: VerifyOptions,
 ) -> Result<(), VerifyError> {
     match provider {
+        Provider::Discord => discord::verify(headers, raw_body, secret, &options),
         Provider::GitHub => github::verify(headers, raw_body, secret, &options),
         Provider::Linear => linear::verify(headers, raw_body, secret, &options),
         Provider::Shopify => shopify::verify(headers, raw_body, secret, &options),
@@ -83,7 +89,6 @@ pub fn verify(
         }
         Provider::Square
         | Provider::Twilio
-        | Provider::Discord
         | Provider::PayPal
         | Provider::SendGrid
         | Provider::Zoom

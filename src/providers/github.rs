@@ -280,7 +280,7 @@ mod tests {
                 },
             ),
         ];
-        for &(value, ref expected) in cases {
+        for &(value, expected) in cases {
             let result = verify(
                 crate::Provider::GitHub,
                 &[(SIGNATURE_HEADER, value)],
@@ -288,7 +288,7 @@ mod tests {
                 &Secret::new(OFFICIAL_SECRET),
                 Default::default(),
             );
-            assert_eq!(result, Err(expected.clone()), "input: {value:?}");
+            assert_eq!(result, Err(expected), "input: {value:?}");
         }
     }
 
