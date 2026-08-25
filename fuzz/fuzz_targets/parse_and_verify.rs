@@ -98,6 +98,11 @@ fuzz_target!(|data: &[u8]| {
     attempt(Provider::Twilio, &headers, body, WELL_FORMED_SECRET, &twilio_options);
     attempt(Provider::Twilio, &headers, body, WELL_FORMED_SECRET, &VerifyOptions::default());
 
+    // PayPal and SendGrid are not implemented yet; their fail-closed
+    // `UnsupportedProvider` path must also never panic on arbitrary input.
+    attempt(Provider::PayPal, &headers, body, WELL_FORMED_SECRET, &VerifyOptions::default());
+    attempt(Provider::SendGrid, &headers, body, WELL_FORMED_SECRET, &VerifyOptions::default());
+
     // CustomScheme (spec §2.2): a Slack-shaped configuration exercises the
     // prefix-strip, hex-decode, timestamp-parse, and user signed-string
     // paths with arbitrary bytes; the raw-body/base64 variant covers the
