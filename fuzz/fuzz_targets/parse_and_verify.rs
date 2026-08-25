@@ -31,6 +31,9 @@ const IMPLEMENTED: &[Provider] = &[
     // Twilio is exercised separately below: it needs form-param context to
     // reach its signature path, and ignores the raw body by design.
     Provider::Twilio,
+    // Zoom needs two headers (signature + timestamp) to reach its signature
+    // path; timestamp-based replay is exercised via arbitrary body bytes.
+    Provider::Zoom,
 ];
 
 /// A well-formed secret for each provider's scheme, so the fuzzer reaches the

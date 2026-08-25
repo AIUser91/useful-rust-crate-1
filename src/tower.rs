@@ -611,7 +611,7 @@ mod tests {
 
     #[test]
     fn unsupported_provider_maps_to_internal_server_error() {
-        let svc = VerifyLayer::new(Provider::Zoom, Secret::new("unused")).layer(EchoLen);
+        let svc = VerifyLayer::new(Provider::PayPal, Secret::new("unused")).layer(EchoLen);
         let request = Request::builder()
             .body(TestBody::new(Bytes::from_static(b"{}")))
             .unwrap_or_else(|_| unreachable!("no headers to misbuild"));

@@ -15,6 +15,7 @@ mod square;
 mod standard_webhooks;
 mod stripe;
 mod twilio;
+mod zoom;
 
 pub use custom::{CustomScheme, Encoding, HashAlg};
 
@@ -93,6 +94,7 @@ pub(crate) fn signature_header_names(provider: &Provider) -> Vec<&'static str> {
             vec![discord::SIGNATURE_HEADER, discord::TIMESTAMP_HEADER]
         }
         Provider::Linear => vec![linear::SIGNATURE_HEADER],
+        Provider::Zoom => vec![zoom::SIGNATURE_HEADER, zoom::TIMESTAMP_HEADER],
         Provider::StandardWebhooks => vec![
             standard_webhooks::ID_HEADER,
             standard_webhooks::TIMESTAMP_HEADER,
@@ -105,7 +107,7 @@ pub(crate) fn signature_header_names(provider: &Provider) -> Vec<&'static str> {
             }
             names
         }
-        Provider::PayPal | Provider::SendGrid | Provider::Zoom | Provider::Dropbox => Vec::new(),
+        Provider::PayPal | Provider::SendGrid | Provider::Dropbox => Vec::new(),
     }
 }
 
@@ -132,6 +134,7 @@ pub fn verify(
         Provider::Discord => discord::verify(headers, raw_body, secret, &options),
         Provider::GitHub => github::verify(headers, raw_body, secret, &options),
         Provider::Linear => linear::verify(headers, raw_body, secret, &options),
+        Provider::Zoom => zoom::verify(headers, raw_body, secret, &options),
         Provider::Shopify => shopify::verify(headers, raw_body, secret, &options),
         Provider::Slack => slack::verify(headers, raw_body, secret, &options),
         Provider::Square => square::verify(headers, raw_body, secret, &options),
@@ -141,7 +144,7 @@ pub fn verify(
         }
         Provider::Twilio => twilio::verify(headers, raw_body, secret, &options),
         Provider::Custom(scheme) => custom::verify(&scheme, headers, raw_body, secret, &options),
-        Provider::PayPal | Provider::SendGrid | Provider::Zoom | Provider::Dropbox => {
+        Provider::PayPal | Provider::SendGrid | Provider::Dropbox => {
             Err(VerifyError::UnsupportedProvider)
         }
     }
