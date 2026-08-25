@@ -20,6 +20,8 @@ mod zoom;
 
 pub use custom::{CustomScheme, Encoding, HashAlg};
 
+use std::fmt;
+
 use crate::core::VerifyOptions;
 use crate::core::error::VerifyError;
 use crate::core::headers::HeaderMap;
@@ -70,6 +72,29 @@ pub enum Provider {
     /// with the same constant-time and fail-closed guarantees as the
     /// built-ins. See [`CustomScheme`].
     Custom(CustomScheme),
+}
+
+impl fmt::Display for Provider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Provider::Stripe => f.write_str("Stripe"),
+            Provider::GitHub => f.write_str("GitHub"),
+            Provider::Shopify => f.write_str("Shopify"),
+            Provider::Slack => f.write_str("Slack"),
+            Provider::Square => f.write_str("Square"),
+            Provider::Twilio => f.write_str("Twilio"),
+            Provider::Discord => f.write_str("Discord"),
+            Provider::PayPal => f.write_str("PayPal"),
+            Provider::SendGrid => f.write_str("SendGrid"),
+            Provider::Linear => f.write_str("Linear"),
+            Provider::Zoom => f.write_str("Zoom"),
+            Provider::Dropbox => f.write_str("Dropbox"),
+            Provider::StandardWebhooks => f.write_str("StandardWebhooks"),
+            Provider::Custom(scheme) => {
+                write!(f, "Custom({})", scheme.signature_header)
+            }
+        }
+    }
 }
 
 /// Header names that carry signing material for `provider`, per its row in
@@ -351,5 +376,35 @@ mod tests {
             ),
             Ok(())
         );
+    }
+
+    #[test]
+    fn provider_display_names() {
+        use super::CustomScheme;
+        use crate::{Encoding, HashAlg};
+
+        assert_eq!(Provider::Stripe.to_string(), "Stripe");
+        assert_eq!(Provider::GitHub.to_string(), "GitHub");
+        assert_eq!(Provider::Shopify.to_string(), "Shopify");
+        assert_eq!(Provider::Slack.to_string(), "Slack");
+        assert_eq!(Provider::Square.to_string(), "Square");
+        assert_eq!(Provider::Twilio.to_string(), "Twilio");
+        assert_eq!(Provider::Discord.to_string(), "Discord");
+        assert_eq!(Provider::PayPal.to_string(), "PayPal");
+        assert_eq!(Provider::SendGrid.to_string(), "SendGrid");
+        assert_eq!(Provider::Linear.to_string(), "Linear");
+        assert_eq!(Provider::Zoom.to_string(), "Zoom");
+        assert_eq!(Provider::Dropbox.to_string(), "Dropbox");
+        assert_eq!(Provider::StandardWebhooks.to_string(), "StandardWebhooks");
+
+        let custom = Provider::Custom(CustomScheme {
+            hash: HashAlg::Sha256,
+            signature_header: "X-My-Sig",
+            timestamp_header: None,
+            encoding: Encoding::Hex,
+            prefix: None,
+            signed_string: |_h, b| b.to_vec(),
+        });
+        assert_eq!(custom.to_string(), "Custom(X-My-Sig)");
     }
 }
