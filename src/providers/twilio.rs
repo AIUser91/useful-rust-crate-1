@@ -85,9 +85,12 @@ pub(crate) fn verify(
         .ok_or(VerifyError::MissingContext {
             reason: "Twilio signs the full request URL; set VerifyOptions::request_url",
         })?;
-    let params = options.form_params.as_ref().ok_or(VerifyError::MissingContext {
-        reason: "Twilio signs the sorted POST form fields; set VerifyOptions::form_params",
-    })?;
+    let params = options
+        .form_params
+        .as_ref()
+        .ok_or(VerifyError::MissingContext {
+            reason: "Twilio signs the sorted POST form fields; set VerifyOptions::form_params",
+        })?;
 
     let provided = parse_signature(value)?;
     let key = auth_token_bytes(secret.as_bytes())?;
@@ -252,10 +255,7 @@ mod tests {
             Ok(())
         );
         assert_eq!(
-            verify_with(
-                &[("Body", "a"), ("Body", "b")],
-                DUPLICATE_KEYS_SIGNATURE
-            ),
+            verify_with(&[("Body", "a"), ("Body", "b")], DUPLICATE_KEYS_SIGNATURE),
             Ok(())
         );
         assert_eq!(
@@ -411,7 +411,12 @@ mod tests {
             max_age: Some(std::time::Duration::ZERO),
             clock: None,
             request_url: Some(OFFICIAL_URL.to_string()),
-            form_params: Some(OFFICIAL_PARAMS.iter().map(|&(k, v)| (k.to_string(), v.to_string())).collect()),
+            form_params: Some(
+                OFFICIAL_PARAMS
+                    .iter()
+                    .map(|&(k, v)| (k.to_string(), v.to_string()))
+                    .collect(),
+            ),
         };
         let result = verify(
             crate::Provider::Twilio,

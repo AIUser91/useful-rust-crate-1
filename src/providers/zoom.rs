@@ -165,10 +165,7 @@ mod tests {
         }
     }
 
-    fn zoom_headers(
-        timestamp: u64,
-        signature: &str,
-    ) -> Vec<(String, String)> {
+    fn zoom_headers(timestamp: u64, signature: &str) -> Vec<(String, String)> {
         vec![
             (SIGNATURE_HEADER.to_string(), format!("v0={signature}")),
             (TIMESTAMP_HEADER.to_string(), timestamp.to_string()),

@@ -92,9 +92,11 @@ mod tests {
     /// `echo -n '{\"action\":\"create\",\"type\":\"Issue\"}' | openssl dgst -sha256 -hmac "test_secret_key"`
     const SIGNATURE: &str = "d6fe7d87e27be0fa47a19aad05513445b414caae226a30677d7bdb9d78b836a0";
     /// Locally constructed over an empty body (boundary case).
-    const EMPTY_BODY_SIGNATURE: &str = "c1d7be015fcffd2d515199541faf4890f80f14b546b41ccc18bbe8573ab08b0a";
+    const EMPTY_BODY_SIGNATURE: &str =
+        "c1d7be015fcffd2d515199541faf4890f80f14b546b41ccc18bbe8573ab08b0a";
     /// Locally constructed over `"héllo, 🦀 world!"` (unicode boundary case).
-    const UNICODE_BODY_SIGNATURE: &str = "6fddeb6c7e9d5fa8a4d7d45ba7396f62d4524a01a230f9767b0c2d0351f9bf66";
+    const UNICODE_BODY_SIGNATURE: &str =
+        "6fddeb6c7e9d5fa8a4d7d45ba7396f62d4524a01a230f9767b0c2d0351f9bf66";
 
     fn linear_headers(signature: &str) -> Vec<(String, String)> {
         vec![(SIGNATURE_HEADER.to_string(), signature.to_string())]
@@ -151,7 +153,10 @@ mod tests {
     #[test]
     fn tampered_body_fails() {
         assert_eq!(
-            verify_with(b"{\"action\":\"create\",\"type\":\"Issue\",\"tampered\":true}", SIGNATURE),
+            verify_with(
+                b"{\"action\":\"create\",\"type\":\"Issue\",\"tampered\":true}",
+                SIGNATURE
+            ),
             Err(VerifyError::SignatureMismatch)
         );
     }

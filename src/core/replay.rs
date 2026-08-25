@@ -87,7 +87,10 @@ mod tests {
 
     #[test]
     fn parses_valid_timestamp() {
-        assert_eq!(parse_timestamp("X-Timestamp", "1700000000"), Ok(1_700_000_000));
+        assert_eq!(
+            parse_timestamp("X-Timestamp", "1700000000"),
+            Ok(1_700_000_000)
+        );
     }
 
     #[test]
