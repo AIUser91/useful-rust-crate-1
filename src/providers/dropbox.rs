@@ -86,14 +86,17 @@ mod tests {
     use std::time::Duration;
 
     const SECRET: &str = "dropbox_test_secret";
-    const BODY: &[u8] = b"{\"list_folder\":{\"accounts\":[\"dbid:AAH4f99T0taONFbNO56Ru6wQQq-aVsd8\"]}}";
+    const BODY: &[u8] =
+        b"{\"list_folder\":{\"accounts\":[\"dbid:AAH4f99T0taONFbNO56Ru6wQQq-aVsd8\"]}}";
     /// Locally constructed:
     /// `printf '{"list_folder":{"accounts":["dbid:AAH4f99T0taONFbNO56Ru6wQQq-aVsd8"]}}' | openssl dgst -sha256 -hmac "dropbox_test_secret" | awk '{print $NF}'`
     const SIGNATURE: &str = "80d62d988f7b55b88cccbfe41f348828e376ba2162e1f798a6f881b3b2e3196b";
     /// Locally constructed over an empty body (boundary case).
-    const EMPTY_BODY_SIGNATURE: &str = "1b44744418631390847b9cee029ad71f07c4c4d9def0fc082438a94ceb635261";
+    const EMPTY_BODY_SIGNATURE: &str =
+        "1b44744418631390847b9cee029ad71f07c4c4d9def0fc082438a94ceb635261";
     /// Locally constructed over `"héllo, 🦀 world!"` (unicode boundary case).
-    const UNICODE_BODY_SIGNATURE: &str = "54e3d27a0921339a3b5cb2dffe3b53fceba8df97a934919ce3cdc2e812b304d3";
+    const UNICODE_BODY_SIGNATURE: &str =
+        "54e3d27a0921339a3b5cb2dffe3b53fceba8df97a934919ce3cdc2e812b304d3";
 
     fn dropbox_headers(signature: &str) -> Vec<(String, String)> {
         vec![(SIGNATURE_HEADER.to_string(), signature.to_string())]
@@ -155,7 +158,8 @@ mod tests {
 
     #[test]
     fn tampered_body_fails() {
-        let tampered = b"{\"list_folder\":{\"accounts\":[\"dbid:AAH4f99T0taONFbNO56Ru6wQQq-aVsd9\"]}}";
+        let tampered =
+            b"{\"list_folder\":{\"accounts\":[\"dbid:AAH4f99T0taONFbNO56Ru6wQQq-aVsd9\"]}}";
         assert_eq!(
             verify_with(tampered, SIGNATURE),
             Err(VerifyError::SignatureMismatch)

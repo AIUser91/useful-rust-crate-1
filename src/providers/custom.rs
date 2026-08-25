@@ -47,13 +47,13 @@
 
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
-use base64::Engine;
 use crate::core::VerifyOptions;
 use crate::core::crypto::{verify_hmac_sha1, verify_hmac_sha256, verify_hmac_sha512};
 use crate::core::error::VerifyError;
 use crate::core::headers::HeaderMap;
 use crate::core::replay::{check_replay, parse_timestamp};
 use crate::core::secret::Secret;
+use base64::Engine;
 
 /// HMAC hash algorithms available to a [`CustomScheme`] (`spec.md` §2.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -153,11 +153,12 @@ pub(crate) fn verify(
     secret: &Secret,
     options: &VerifyOptions,
 ) -> Result<(), VerifyError> {
-    let signature_value = headers
-        .get(scheme.signature_header)
-        .ok_or(VerifyError::MissingHeader {
-            header: scheme.signature_header,
-        })?;
+    let signature_value =
+        headers
+            .get(scheme.signature_header)
+            .ok_or(VerifyError::MissingHeader {
+                header: scheme.signature_header,
+            })?;
 
     let provided_signature = parse_signature(scheme, signature_value)?;
 
@@ -166,9 +167,11 @@ pub(crate) fn verify(
     // have failed — matching how built-in timestamped schemes report.
     let timestamp = match scheme.timestamp_header {
         Some(timestamp_header) => {
-            let raw = headers.get(timestamp_header).ok_or(VerifyError::MissingHeader {
-                header: timestamp_header,
-            })?;
+            let raw = headers
+                .get(timestamp_header)
+                .ok_or(VerifyError::MissingHeader {
+                    header: timestamp_header,
+                })?;
             Some(parse_timestamp(timestamp_header, raw)?)
         }
         None => None,
@@ -198,10 +201,7 @@ pub(crate) fn verify(
 }
 
 /// Decodes the signature header value per the scheme's prefix and encoding.
-fn parse_signature(
-    scheme: &CustomScheme,
-    value: &str,
-) -> Result<Vec<u8>, VerifyError> {
+fn parse_signature(scheme: &CustomScheme, value: &str) -> Result<Vec<u8>, VerifyError> {
     if value.is_empty() {
         return Err(VerifyError::MalformedHeader {
             header: scheme.signature_header,
@@ -210,10 +210,12 @@ fn parse_signature(
     }
 
     let encoded = match scheme.prefix {
-        Some(prefix) => value.strip_prefix(prefix).ok_or(VerifyError::MalformedHeader {
-            header: scheme.signature_header,
-            reason: "signature does not start with the configured scheme prefix",
-        })?,
+        Some(prefix) => value
+            .strip_prefix(prefix)
+            .ok_or(VerifyError::MalformedHeader {
+                header: scheme.signature_header,
+                reason: "signature does not start with the configured scheme prefix",
+            })?,
         None => value,
     };
 
@@ -225,18 +227,14 @@ fn parse_signature(
     }
 
     let bytes = match scheme.encoding {
-        Encoding::Hex => {
-            hex::decode(encoded).map_err(|_| VerifyError::BadEncoding {
-                reason: "signature is not valid hexadecimal",
-            })?
-        }
-        Encoding::Base64 => {
-            base64::engine::general_purpose::STANDARD
-                .decode(encoded)
-                .map_err(|_| VerifyError::BadEncoding {
-                    reason: "signature is not valid base64",
-                })?
-        }
+        Encoding::Hex => hex::decode(encoded).map_err(|_| VerifyError::BadEncoding {
+            reason: "signature is not valid hexadecimal",
+        })?,
+        Encoding::Base64 => base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .map_err(|_| VerifyError::BadEncoding {
+                reason: "signature is not valid base64",
+            })?,
     };
 
     if bytes.len() != scheme.hash.digest_len() {
@@ -299,9 +297,7 @@ mod tests {
     }
 
     fn ts_signed_string(headers: &dyn crate::HeaderMap, raw_body: &[u8]) -> Vec<u8> {
-        let ts = headers
-            .get(ts_scheme::TS_HEADER)
-            .unwrap_or_default();
+        let ts = headers.get(ts_scheme::TS_HEADER).unwrap_or_default();
         let mut signed = Vec::with_capacity(ts.len() + 1 + raw_body.len());
         signed.extend_from_slice(ts.as_bytes());
         signed.push(b'.');
@@ -375,8 +371,7 @@ mod tests {
                 // `v0:{timestamp}:{raw_body}` — timestamp verbatim from its
                 // header, per Slack's docs.
                 let ts = headers.get("X-Slack-Request-Timestamp").unwrap_or_default();
-                let mut signed =
-                    Vec::with_capacity(3 + ts.len() + 1 + raw_body.len());
+                let mut signed = Vec::with_capacity(3 + ts.len() + 1 + raw_body.len());
                 signed.extend_from_slice(b"v0:");
                 signed.extend_from_slice(ts.as_bytes());
                 signed.push(b':');
@@ -388,7 +383,10 @@ mod tests {
         let result = verify_custom(
             &scheme,
             &[
-                ("X-Slack-Signature", format!("v0={SLACK_SIGNATURE}").as_str()),
+                (
+                    "X-Slack-Signature",
+                    format!("v0={SLACK_SIGNATURE}").as_str(),
+                ),
                 ("X-Slack-Request-Timestamp", "1531420618"),
             ],
             SLACK_BODY,
@@ -493,7 +491,10 @@ mod tests {
         let result = verify_custom(
             &ts_scheme_config(),
             &[
-                ("x-example-signature", format!("sha256={}", ts_scheme::PING_SIG).as_str()),
+                (
+                    "x-example-signature",
+                    format!("sha256={}", ts_scheme::PING_SIG).as_str(),
+                ),
                 ("X-EXAMPLE-TIMESTAMP", "1700000000"),
             ],
             ts_scheme::PING_BODY,
@@ -522,7 +523,11 @@ mod tests {
     #[test]
     fn wrong_secret_fails() {
         assert_eq!(
-            verify_ts_fresh_with_secret(ts_scheme::PING_BODY, ts_scheme::PING_SIG, "another secret"),
+            verify_ts_fresh_with_secret(
+                ts_scheme::PING_BODY,
+                ts_scheme::PING_SIG,
+                "another secret"
+            ),
             Err(VerifyError::SignatureMismatch)
         );
     }
@@ -546,7 +551,10 @@ mod tests {
     #[test]
     fn tampered_body_fails() {
         assert_eq!(
-            verify_ts_fresh(b"{\"event\":\"ping\",\"tampered\":true}", ts_scheme::PING_SIG),
+            verify_ts_fresh(
+                b"{\"event\":\"ping\",\"tampered\":true}",
+                ts_scheme::PING_SIG
+            ),
             Err(VerifyError::SignatureMismatch)
         );
     }
@@ -644,7 +652,10 @@ mod tests {
         };
         let result = verify_custom(
             &scheme,
-            &[("X-Raw-Sig", "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843")],
+            &[(
+                "X-Raw-Sig",
+                "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843",
+            )],
             RFC_DATA,
             RFC_KEY,
             VerifyOptions {
@@ -670,7 +681,9 @@ mod tests {
         );
         assert_eq!(
             missing_signature,
-            Err(VerifyError::MissingHeader { header: ts_scheme::HEADER })
+            Err(VerifyError::MissingHeader {
+                header: ts_scheme::HEADER
+            })
         );
 
         let missing_timestamp = verify_custom(

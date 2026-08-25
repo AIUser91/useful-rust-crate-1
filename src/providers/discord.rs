@@ -86,8 +86,7 @@ pub(crate) fn verify(
     // Signed message is `{timestamp_as_sent}{raw_body}`; the raw timestamp
     // substring is reused verbatim so whatever was actually signed is what
     // gets verified.
-    let mut message =
-        Vec::with_capacity(timestamp_raw.len() + raw_body.len());
+    let mut message = Vec::with_capacity(timestamp_raw.len() + raw_body.len());
     message.extend_from_slice(timestamp_raw.as_bytes());
     message.extend_from_slice(raw_body);
 
@@ -142,9 +141,7 @@ fn parse_signature(value: &str) -> Result<Vec<u8>, VerifyError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        PUBLIC_KEY_LEN_BYTES, SIGNATURE_HEADER, SIGNATURE_LEN_BYTES, TIMESTAMP_HEADER,
-    };
+    use super::{PUBLIC_KEY_LEN_BYTES, SIGNATURE_HEADER, SIGNATURE_LEN_BYTES, TIMESTAMP_HEADER};
     use crate::core::error::VerifyError;
     use crate::core::options::{Clock, VerifyOptions};
     use crate::core::secret::Secret;
@@ -157,18 +154,14 @@ mod tests {
     /// not RNG output — so the vectors are reproducible forever; see the
     /// module docs on vector provenance.
     const VECTOR_SEED: [u8; 32] = [
-        0x77, 0x65, 0x62, 0x68, 0x6f, 0x6f, 0x6b, 0x2d, 0x76, 0x65, 0x72, 0x69,
-        0x66, 0x79, 0x2d, 0x74, 0x65, 0x73, 0x74, 0x2d, 0x76, 0x65, 0x63, 0x74,
-        0x6f, 0x72, 0x2d, 0x30, 0x30, 0x30, 0x31, 0x37,
+        0x77, 0x65, 0x62, 0x68, 0x6f, 0x6f, 0x6b, 0x2d, 0x76, 0x65, 0x72, 0x69, 0x66, 0x79, 0x2d,
+        0x74, 0x65, 0x73, 0x74, 0x2d, 0x76, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x2d, 0x30, 0x30, 0x30,
+        0x31, 0x37,
     ];
 
     /// Signs `{timestamp}{body}` exactly as Discord's documented recipe and
     /// returns `(hex_public_key, hex_signature)`.
-    fn sign_locally(
-        seed: &[u8; 32],
-        timestamp: &str,
-        body: &[u8],
-    ) -> (String, String) {
+    fn sign_locally(seed: &[u8; 32], timestamp: &str, body: &[u8]) -> (String, String) {
         let signing_key = ed25519_dalek::SigningKey::from_bytes(seed);
         let mut message = Vec::with_capacity(timestamp.len() + body.len());
         message.extend_from_slice(timestamp.as_bytes());
@@ -253,8 +246,7 @@ mod tests {
         let timestamp = 1_758_600_001;
 
         // Empty body (boundary case).
-        let (key_hex, empty_sig) =
-            sign_locally(&VECTOR_SEED, &timestamp.to_string(), b"");
+        let (key_hex, empty_sig) = sign_locally(&VECTOR_SEED, &timestamp.to_string(), b"");
         assert_eq!(verify_fresh(b"", &key_hex, &empty_sig, timestamp), Ok(()));
 
         // Unicode body (boundary case): signed over raw UTF-8 bytes.
@@ -311,7 +303,12 @@ mod tests {
         let (key_hex, sig_hex) = sign_locally(&VECTOR_SEED, &timestamp.to_string(), body);
 
         assert_eq!(
-            verify_fresh(br#"{"type":1,"data":{"name":"meow"}}"#, &key_hex, &sig_hex, timestamp),
+            verify_fresh(
+                br#"{"type":1,"data":{"name":"meow"}}"#,
+                &key_hex,
+                &sig_hex,
+                timestamp
+            ),
             Err(VerifyError::SignatureMismatch)
         );
     }
@@ -341,8 +338,8 @@ mod tests {
         let (key_hex, sig_hex) = sign_locally(&VECTOR_SEED, &timestamp.to_string(), body);
 
         let other_seed = [
-            1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-            19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+            1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+            24, 25, 26, 27, 28, 29, 30, 31, 32,
         ];
         let (other_key_hex, _) = sign_locally(&other_seed, &timestamp.to_string(), body);
         assert_ne!(other_key_hex, key_hex);
@@ -582,7 +579,10 @@ mod tests {
 
         let cases: Vec<(String, &'static str)> = vec![
             // Not hex at all.
-            ("developer-portal-key".to_string(), "public key is not valid hexadecimal"),
+            (
+                "developer-portal-key".to_string(),
+                "public key is not valid hexadecimal",
+            ),
             // Valid hex but wrong length (truncated paste).
             ("abcd".to_string(), "public key does not decode to 32 bytes"),
             // Empty configuration.

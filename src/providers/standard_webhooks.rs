@@ -212,9 +212,7 @@ fn parse_signatures(value: &str) -> Result<Vec<Vec<u8>>, VerifyError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        ID_HEADER, SECRET_PREFIX, SIGNATURE_HEADER, TIMESTAMP_HEADER,
-    };
+    use super::{ID_HEADER, SECRET_PREFIX, SIGNATURE_HEADER, TIMESTAMP_HEADER};
     use crate::core::error::VerifyError;
     use crate::core::options::{Clock, VerifyOptions};
     use crate::core::secret::Secret;

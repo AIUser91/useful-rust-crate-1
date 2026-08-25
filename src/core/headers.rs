@@ -162,8 +162,14 @@ mod tests {
         #[test]
         fn first_value_wins_for_multivalued_headers() {
             let mut headers = ::http::HeaderMap::new();
-            headers.append("X-Slack-Signature", ::http::HeaderValue::from_static("v0=first"));
-            headers.append("X-Slack-Signature", ::http::HeaderValue::from_static("v0=second"));
+            headers.append(
+                "X-Slack-Signature",
+                ::http::HeaderValue::from_static("v0=first"),
+            );
+            headers.append(
+                "X-Slack-Signature",
+                ::http::HeaderValue::from_static("v0=second"),
+            );
             assert_eq!(
                 HeaderMap::get(&headers, "X-Slack-Signature"),
                 Some("v0=first")

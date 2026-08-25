@@ -147,9 +147,7 @@ pub fn verify(
         Provider::Twilio => twilio::verify(headers, raw_body, secret, &options),
         Provider::Dropbox => dropbox::verify(headers, raw_body, secret, &options),
         Provider::Custom(scheme) => custom::verify(&scheme, headers, raw_body, secret, &options),
-        Provider::PayPal | Provider::SendGrid => {
-            Err(VerifyError::UnsupportedProvider)
-        }
+        Provider::PayPal | Provider::SendGrid => Err(VerifyError::UnsupportedProvider),
     }
 }
 
@@ -204,13 +202,7 @@ pub fn verify_any(
 ) -> Result<(), VerifyError> {
     let mut last_err = VerifyError::SignatureMismatch;
     for secret in secrets {
-        match verify(
-            provider,
-            headers,
-            raw_body,
-            secret,
-            options.clone(),
-        ) {
+        match verify(provider, headers, raw_body, secret, options.clone()) {
             Ok(()) => return Ok(()),
             Err(VerifyError::SignatureMismatch) => {
                 last_err = VerifyError::SignatureMismatch;
@@ -246,8 +238,7 @@ mod tests {
     fn github_headers() -> Vec<(String, String)> {
         vec![(
             "X-Hub-Signature-256".to_string(),
-            "sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17"
-                .to_string(),
+            GITHUB_SIGNATURE.to_string(),
         )]
     }
 

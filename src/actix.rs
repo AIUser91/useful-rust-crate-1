@@ -101,7 +101,9 @@ use actix_web::{
     web::Bytes,
 };
 
-use crate::{HeaderMap, Provider, Secret, VerifyError, VerifyOptions, providers::signature_header_names};
+use crate::{
+    HeaderMap, Provider, Secret, VerifyError, VerifyOptions, providers::signature_header_names,
+};
 
 /// Configuration used by the [`VerifiedBody`] extractor: provider, secret,
 /// and verification options.
@@ -353,10 +355,7 @@ mod tests {
     use super::*;
     // Aliased: a plain `use ..::test` would make `#[test]` resolve to the
     // actix module instead of the built-in attribute.
-    use actix_web::{
-        App, HttpResponse, http, web,
-        test as aw_test,
-    };
+    use actix_web::{App, HttpResponse, http, test as aw_test, web};
 
     /// GitHub's documented example vector
     /// (<https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries>),
@@ -452,8 +451,7 @@ mod tests {
     #[actix_web::test]
     async fn tampered_body_is_unauthorized_and_never_reaches_handler() {
         let app = github_app!();
-        let res =
-            aw_test::call_service(&app, github_request(b"Hello, World?").to_request()).await;
+        let res = aw_test::call_service(&app, github_request(b"Hello, World?").to_request()).await;
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
     }
 
@@ -476,9 +474,10 @@ mod tests {
         let app = github_app!();
         let req = aw_test::TestRequest::post()
             .append_header(("X-Hub-Signature-256", GITHUB_SIGNATURE))
-            .append_header(
-                ("x-hub-signature-256", "sha256=0000000000000000000000000000000000000000000000000000000000000000"),
-            )
+            .append_header((
+                "x-hub-signature-256",
+                "sha256=0000000000000000000000000000000000000000000000000000000000000000",
+            ))
             .set_payload(Bytes::from_static(GITHUB_BODY))
             .to_request();
         let res = aw_test::call_service(&app, req).await;
@@ -503,7 +502,10 @@ mod tests {
         // lives in the timestamp header, not the signature header itself.
         let app = aw_test::init_service(
             App::new()
-                .app_data(WebhookConfig::new(Provider::Slack, Secret::new(SLACK_SECRET)))
+                .app_data(WebhookConfig::new(
+                    Provider::Slack,
+                    Secret::new(SLACK_SECRET),
+                ))
                 .route("/", web::post().to(echo_len_slack)),
         )
         .await;
@@ -530,8 +532,8 @@ mod tests {
 
     #[actix_web::test]
     async fn stale_timestamp_is_unauthorized_through_adapter() {
-        let signed_at = std::time::SystemTime::UNIX_EPOCH
-            + std::time::Duration::from_secs(SLACK_TIMESTAMP);
+        let signed_at =
+            std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(SLACK_TIMESTAMP);
         // "Now" ten minutes after signing: outside the default 300s window.
         let late = signed_at + std::time::Duration::from_secs(600);
 
@@ -596,7 +598,10 @@ mod tests {
         // A single well-formed value verifies end to end.
         let good_app = aw_test::init_service(
             App::new()
-                .app_data(WebhookConfig::new(Provider::Custom(scheme), Secret::new("k")))
+                .app_data(WebhookConfig::new(
+                    Provider::Custom(scheme),
+                    Secret::new("k"),
+                ))
                 .route("/", web::post().to(echo_len)),
         )
         .await;
@@ -642,8 +647,8 @@ mod tests {
         // value); downstream lookup reports them absent and fails closed.
         let name = HeaderName::from_static("x-hub-signature-256");
         let mut headers = ActixHeaderMap::new();
-        let value =
-            http::header::HeaderValue::from_bytes(&[0xFF]).unwrap_or_else(|_| unreachable!("permitted"));
+        let value = http::header::HeaderValue::from_bytes(&[0xFF])
+            .unwrap_or_else(|_| unreachable!("permitted"));
         headers.append(name.clone(), value.clone());
         headers.append(name, value);
         assert!(conflicting_signature_header(&headers, &["X-Hub-Signature-256"]).is_none());
@@ -660,13 +665,17 @@ mod tests {
             HeaderMap::get(&headers, "x-hub-signature-256"),
             Some(GITHUB_SIGNATURE)
         );
-        assert_eq!(HeaderMap::get(&headers, "X-HUB-SIGNATURE-256"), Some(GITHUB_SIGNATURE));
+        assert_eq!(
+            HeaderMap::get(&headers, "X-HUB-SIGNATURE-256"),
+            Some(GITHUB_SIGNATURE)
+        );
         assert_eq!(HeaderMap::get(&headers, "bad name\n"), None);
         // Opaque-byte values cannot be signatures; reported absent.
         let mut opaque = ActixHeaderMap::new();
         opaque.insert(
             HeaderName::from_static("x-webhook-sig"),
-            http::header::HeaderValue::from_bytes(&[0xFF]).unwrap_or_else(|_| unreachable!("permitted")),
+            http::header::HeaderValue::from_bytes(&[0xFF])
+                .unwrap_or_else(|_| unreachable!("permitted")),
         );
         assert_eq!(HeaderMap::get(&opaque, "X-Webhook-Sig"), None);
     }

@@ -435,8 +435,10 @@ mod tests {
                 .unwrap_or_else(|_| unreachable!("static parts build a valid request"));
             let svc = github_service();
             block_on(async {
-                let response =
-                    svc.oneshot(request).await.unwrap_or_else(|error| panic!("{error}"));
+                let response = svc
+                    .oneshot(request)
+                    .await
+                    .unwrap_or_else(|error| panic!("{error}"));
                 assert_eq!(response.status(), StatusCode::OK);
                 assert_eq!(
                     response.into_body().into_inner().unwrap_or_default(),
@@ -470,7 +472,10 @@ mod tests {
             .unwrap_or_else(|_| unreachable!("no headers to misbuild"));
         block_on(async {
             let svc = github_service();
-            let response = svc.oneshot(request).await.unwrap_or_else(|error| panic!("{error}"));
+            let response = svc
+                .oneshot(request)
+                .await
+                .unwrap_or_else(|error| panic!("{error}"));
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         });
     }
@@ -489,7 +494,10 @@ mod tests {
             .unwrap_or_else(|_| unreachable!("static parts build a valid request"));
         block_on(async {
             let svc = github_service();
-            let response = svc.oneshot(request).await.unwrap_or_else(|error| panic!("{error}"));
+            let response = svc
+                .oneshot(request)
+                .await
+                .unwrap_or_else(|error| panic!("{error}"));
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         });
     }
@@ -503,7 +511,10 @@ mod tests {
             .unwrap_or_else(|_| unreachable!("static parts build a valid request"));
         block_on(async {
             let svc = github_service();
-            let response = svc.oneshot(request).await.unwrap_or_else(|error| panic!("{error}"));
+            let response = svc
+                .oneshot(request)
+                .await
+                .unwrap_or_else(|error| panic!("{error}"));
             assert_eq!(response.status(), StatusCode::OK);
         });
     }
@@ -519,10 +530,12 @@ mod tests {
             .body(TestBody::new(Bytes::from_static(SLACK_BODY)))
             .unwrap_or_else(|_| unreachable!("static parts build a valid request"));
 
-        let svc =
-            VerifyLayer::new(Provider::Slack, Secret::new(SLACK_SECRET)).layer(EchoLen);
+        let svc = VerifyLayer::new(Provider::Slack, Secret::new(SLACK_SECRET)).layer(EchoLen);
         block_on(async {
-            let response = svc.oneshot(request).await.unwrap_or_else(|error| panic!("{error}"));
+            let response = svc
+                .oneshot(request)
+                .await
+                .unwrap_or_else(|error| panic!("{error}"));
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         });
     }
@@ -546,8 +559,8 @@ mod tests {
             .body(TestBody::new(Bytes::from_static(SLACK_BODY)))
             .unwrap_or_else(|_| unreachable!("static parts build a valid request"));
 
-        let signed_at = std::time::SystemTime::UNIX_EPOCH
-            + std::time::Duration::from_secs(SLACK_TIMESTAMP);
+        let signed_at =
+            std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(SLACK_TIMESTAMP);
         // "Now" ten minutes after signing: outside the default 300s window.
         let late = signed_at + std::time::Duration::from_secs(600);
         let svc = VerifyLayer::with_options(
@@ -561,7 +574,10 @@ mod tests {
         .layer(EchoLen);
 
         block_on(async {
-            let response = svc.oneshot(request).await.unwrap_or_else(|error| panic!("{error}"));
+            let response = svc
+                .oneshot(request)
+                .await
+                .unwrap_or_else(|error| panic!("{error}"));
             assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
         });
     }
@@ -589,10 +605,12 @@ mod tests {
             .header("x-my-sig", "sha256=00")
             .body(TestBody::new(Bytes::from_static(GITHUB_BODY)))
             .unwrap_or_else(|_| unreachable!("static parts build a valid request"));
-        let svc =
-            VerifyLayer::new(Provider::Custom(scheme), Secret::new("k")).layer(EchoLen);
+        let svc = VerifyLayer::new(Provider::Custom(scheme), Secret::new("k")).layer(EchoLen);
         block_on(async {
-            let response = svc.oneshot(ambiguous).await.unwrap_or_else(|error| panic!("{error}"));
+            let response = svc
+                .oneshot(ambiguous)
+                .await
+                .unwrap_or_else(|error| panic!("{error}"));
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         });
 
@@ -602,9 +620,11 @@ mod tests {
             .body(TestBody::new(Bytes::from_static(GITHUB_BODY)))
             .unwrap_or_else(|_| unreachable!("static parts build a valid request"));
         block_on(async {
-            let svc = VerifyLayer::new(Provider::Custom(scheme), Secret::new("k"))
-                .layer(EchoLen);
-            let response = svc.oneshot(good).await.unwrap_or_else(|error| panic!("{error}"));
+            let svc = VerifyLayer::new(Provider::Custom(scheme), Secret::new("k")).layer(EchoLen);
+            let response = svc
+                .oneshot(good)
+                .await
+                .unwrap_or_else(|error| panic!("{error}"));
             assert_eq!(response.status(), StatusCode::OK);
         });
     }
@@ -616,7 +636,10 @@ mod tests {
             .body(TestBody::new(Bytes::from_static(b"{}")))
             .unwrap_or_else(|_| unreachable!("no headers to misbuild"));
         block_on(async {
-            let response = svc.oneshot(request).await.unwrap_or_else(|error| panic!("{error}"));
+            let response = svc
+                .oneshot(request)
+                .await
+                .unwrap_or_else(|error| panic!("{error}"));
             assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
         });
     }
@@ -628,8 +651,8 @@ mod tests {
         // Two identical opaque-byte values are not ambiguous per §4.4 (same
         // value); downstream lookup reports them absent and fails closed.
         let mut headers = ::http::HeaderMap::new();
-        let value =
-            ::http::HeaderValue::from_bytes(&[0xFF]).unwrap_or_else(|_| unreachable!("0xFF is permitted"));
+        let value = ::http::HeaderValue::from_bytes(&[0xFF])
+            .unwrap_or_else(|_| unreachable!("0xFF is permitted"));
         headers.append("X-Hub-Signature-256", value.clone());
         headers.append("X-Hub-Signature-256", value);
         assert!(conflicting_signature_header(&headers, &["X-Hub-Signature-256"]).is_none());

@@ -191,7 +191,9 @@ mod tests {
     #[test]
     fn hmac_sha512_matches_rfc4231_vector() {
         // RFC 4231 test case 2: key "Jefe", data "what do ya want for nothing?"
-        let sig = decode("164b7a7bfcf819e2e395fbe73b56e0a387bd64222e831fd610270cd7ea2505549758bf75c05a994a6d034f65f8f0e6fdcaeab1a34d4a6b4b636e070a38bce737");
+        let sig = decode(
+            "164b7a7bfcf819e2e395fbe73b56e0a387bd64222e831fd610270cd7ea2505549758bf75c05a994a6d034f65f8f0e6fdcaeab1a34d4a6b4b636e070a38bce737",
+        );
         assert!(verify_hmac_sha512(
             b"Jefe",
             b"what do ya want for nothing?",
@@ -201,7 +203,9 @@ mod tests {
 
     #[test]
     fn hmac_sha512_rejects_tampered_and_wrong_length() {
-        let sig = decode("164b7a7bfcf819e2e395fbe73b56e0a387bd64222e831fd610270cd7ea2505549758bf75c05a994a6d034f65f8f0e6fdcaeab1a34d4a6b4b636e070a38bce737");
+        let sig = decode(
+            "164b7a7bfcf819e2e395fbe73b56e0a387bd64222e831fd610270cd7ea2505549758bf75c05a994a6d034f65f8f0e6fdcaeab1a34d4a6b4b636e070a38bce737",
+        );
         let mut flipped = sig.clone();
         flipped[0] ^= 0x01;
         assert!(!verify_hmac_sha512(
@@ -253,11 +257,7 @@ mod tests {
         assert!(!verify_ed25519(&public_key, b"hello", &padded));
 
         // Wrong-length public key.
-        assert!(!verify_ed25519(
-            &public_key[..31],
-            b"hello",
-            &signature
-        ));
+        assert!(!verify_ed25519(&public_key[..31], b"hello", &signature));
 
         // Non-canonical / non-decodable public key (all-ones is not a valid
         // compressed point encoding).
