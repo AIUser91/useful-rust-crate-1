@@ -132,6 +132,7 @@ impl fmt::Debug for WebhookConfig {
 
 impl WebhookConfig {
     /// Verifies `provider` signatures using the shared `secret`.
+    #[must_use]
     pub fn new(provider: Provider, secret: Secret) -> Self {
         Self::with_options(provider, secret, VerifyOptions::default())
     }
@@ -139,6 +140,7 @@ impl WebhookConfig {
     /// Like [`WebhookConfig::new`], with explicit [`VerifyOptions`]
     /// (timestamp tolerance, injected clock, URL-scoped schemes such as
     /// Square/Twilio).
+    #[must_use]
     pub fn with_options(provider: Provider, secret: Secret, options: VerifyOptions) -> Self {
         Self {
             provider,
