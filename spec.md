@@ -308,7 +308,24 @@ Discord's official SDKs (`discord-interactions-js`,
   land, both remain available as documented `CustomScheme` recipes plus
   tested helper functions.
 
-### Linear / Zoom / Dropbox
+### Zoom
+
+Source: <https://developers.zoom.us/docs/api/webhooks/> ("Verify webhook
+events") and Zoom's official sample app
+(<https://github.com/zoom/webhook-sample-node.js>).
+
+- Headers: `x-zm-signature: v0=<hex_hmac>`, `x-zm-request-timestamp`
+- Signed string: `"v0:{timestamp}:{raw_body}"` — the version prefix, the
+  timestamp exactly as it appears in its header, and the raw request body
+  bytes, joined by literal colons. Identical construction to Slack's scheme.
+- Algorithm: HMAC-SHA256, hex-encoded, prefixed `v0=` in the header
+- Key: the webhook secret token as a plain UTF-8 string (not decoded).
+- Replay protection: compare `|now - t|` against [`VerifyOptions::max_age`]
+  (default 300s), using the shared symmetric tolerance semantics. Zoom's
+  docs do not define a recommended window; the timestamp exists so receivers
+  *can* reject stale deliveries.
+
+### Linear / Dropbox
 
 - Standard single-secret HMAC-SHA256 schemes, hex or base64 per provider
   documentation; each gets its own row in the vector table but no special

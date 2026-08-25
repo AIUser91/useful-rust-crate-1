@@ -612,7 +612,7 @@ mod tests {
     async fn unsupported_provider_maps_to_internal_server_error() {
         let app = aw_test::init_service(
             App::new()
-                .app_data(WebhookConfig::new(Provider::Zoom, Secret::new("unused")))
+                .app_data(WebhookConfig::new(Provider::PayPal, Secret::new("unused")))
                 .route("/", web::post().to(echo_len_slack)),
         )
         .await;
