@@ -152,3 +152,212 @@ pub fn verify(
         }
     }
 }
+
+/// Tries multiple secrets during a zero-downtime rotation window.
+///
+/// Stripe and Standard Webhooks allow multiple valid signatures during secret
+/// rotation (e.g. `v1=...,v1=...`). This function accepts a slice of
+/// [`Secret`]s — each representing an active signing key — and returns
+/// `Ok(())` if *any* of them verifies. On total failure it returns
+/// `Err(VerifyError::SignatureMismatch)` regardless of *which* secrets
+/// failed or why (no timing leak about which key was closest).
+///
+/// For providers whose signing scheme itself embeds multiple signatures
+/// (Stripe's `v1=` list, Standard Webhooks' space-delimited `v1,<sig>`
+/// list), prefer [`verify()`] with a single secret — the per-provider
+/// multi-sig logic already accepts any matching element. `verify_any` is
+/// for the *separate* case where the provider's config allows *multiple
+/// distinct keys* to be valid simultaneously (e.g. during key rotation).
+///
+/// # Empty slice
+///
+/// Passing an empty `secrets` slice returns `SignatureMismatch` immediately
+/// — there is nothing to try and no attacker-controlled input to parse.
+///
+/// # Example
+///
+/// ```no_run
+/// use webhook_verify::{verify_any, HeaderMap, Provider, Secret};
+///
+/// # let headers: Vec<(String, String)> = vec![];
+/// # let raw_body: &[u8] = b"";
+/// // During rotation, both the old and new keys are valid.
+/// let secrets = [
+///     Secret::new("whsec_old_key_being_rotated_out"),
+///     Secret::new("whsec_new_key_being_rotated_in"),
+/// ];
+///
+/// let result = verify_any(
+///     Provider::Stripe,
+///     &headers,
+///     raw_body,
+///     &secrets,
+///     Default::default(),
+/// );
+/// ```
+pub fn verify_any(
+    provider: Provider,
+    headers: &dyn HeaderMap,
+    raw_body: &[u8],
+    secrets: &[Secret],
+    options: VerifyOptions,
+) -> Result<(), VerifyError> {
+    let mut last_err = VerifyError::SignatureMismatch;
+    for secret in secrets {
+        match verify(
+            provider,
+            headers,
+            raw_body,
+            secret,
+            options.clone(),
+        ) {
+            Ok(()) => return Ok(()),
+            Err(VerifyError::SignatureMismatch) => {
+                last_err = VerifyError::SignatureMismatch;
+            }
+            Err(other) => {
+                // Structural errors (MissingHeader, MalformedHeader,
+                // BadEncoding, etc.) are deterministic across all secrets —
+                // the error occurs before any secret-dependent work. Return
+                // it immediately so callers can distinguish a malformed
+                // request from a forged signature.
+                return Err(other);
+            }
+        }
+    }
+    // All secrets exhausted with SignatureMismatch: return the same error
+    // regardless of how many were tried, to avoid leaking information
+    // about which key was "closest" via timing differences.
+    Err(last_err)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::secret::Secret;
+
+    /// GitHub's documented example vector
+    /// (<https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries>).
+    const GITHUB_SECRET: &str = "It's a Secret to Everybody";
+    const GITHUB_BODY: &[u8] = b"Hello, World!";
+    const GITHUB_SIGNATURE: &str =
+        "sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17";
+
+    fn github_headers() -> Vec<(String, String)> {
+        vec![(
+            "X-Hub-Signature-256".to_string(),
+            "sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17"
+                .to_string(),
+        )]
+    }
+
+    #[test]
+    fn verify_any_accepts_first_matching_secret() {
+        // First verify that verify() itself works.
+        let direct = super::verify(
+            Provider::GitHub,
+            &github_headers(),
+            GITHUB_BODY,
+            &Secret::new(GITHUB_SECRET),
+            Default::default(),
+        );
+        assert_eq!(direct, Ok(()), "direct verify: {direct:?}");
+
+        let secrets = [
+            Secret::new("wrong-key"),
+            Secret::new(GITHUB_SECRET),
+            Secret::new("another-wrong-key"),
+        ];
+        assert_eq!(
+            verify_any(
+                Provider::GitHub,
+                &github_headers(),
+                GITHUB_BODY,
+                &secrets,
+                Default::default(),
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn verify_any_accepts_single_secret() {
+        let secrets = [Secret::new(GITHUB_SECRET)];
+        assert_eq!(
+            verify_any(
+                Provider::GitHub,
+                &github_headers(),
+                GITHUB_BODY,
+                &secrets,
+                Default::default(),
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn verify_any_rejects_when_no_secret_matches() {
+        let secrets = [Secret::new("wrong-1"), Secret::new("wrong-2")];
+        assert_eq!(
+            verify_any(
+                Provider::GitHub,
+                &github_headers(),
+                GITHUB_BODY,
+                &secrets,
+                Default::default(),
+            ),
+            Err(VerifyError::SignatureMismatch)
+        );
+    }
+
+    #[test]
+    fn verify_any_rejects_empty_slice() {
+        let secrets: [Secret; 0] = [];
+        let headers: Vec<(String, String)> = github_headers().to_vec();
+        assert_eq!(
+            verify_any(
+                Provider::GitHub,
+                &headers,
+                GITHUB_BODY,
+                &secrets,
+                Default::default(),
+            ),
+            Err(VerifyError::SignatureMismatch)
+        );
+    }
+
+    #[test]
+    fn verify_any_fails_closed_on_malformed_input() {
+        // Missing header — error comes from parsing, not the secret check.
+        let secrets = [Secret::new(GITHUB_SECRET)];
+        let empty_headers: Vec<(String, String)> = vec![];
+        assert_eq!(
+            verify_any(
+                Provider::GitHub,
+                &empty_headers,
+                GITHUB_BODY,
+                &secrets,
+                Default::default(),
+            ),
+            Err(VerifyError::MissingHeader {
+                header: "X-Hub-Signature-256"
+            })
+        );
+    }
+
+    #[test]
+    fn verify_any_non_first_secret_matches() {
+        // Only the second key is correct; first is wrong.
+        let secrets = [Secret::new("bad"), Secret::new(GITHUB_SECRET)];
+        assert_eq!(
+            verify_any(
+                Provider::GitHub,
+                &github_headers(),
+                GITHUB_BODY,
+                &secrets,
+                Default::default(),
+            ),
+            Ok(())
+        );
+    }
+}
