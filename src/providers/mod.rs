@@ -69,6 +69,45 @@ pub enum Provider {
     Custom(CustomScheme),
 }
 
+/// Header names that carry signing material for `provider`, per its row in
+/// `spec.md` §3.
+///
+/// Used by framework adapters (behind the `tower` feature) to reject requests
+/// whose signature headers arrive duplicated with conflicting values — see the
+/// ambiguity contract on [`crate::HeaderMap`] and `spec.md` §4.4, which the
+/// first-match-only lookup cannot detect on its own.
+///
+/// Returns an empty list for providers that are not implemented yet; their
+/// verification fails closed with [`VerifyError::UnsupportedProvider`]
+/// regardless.
+pub(crate) fn signature_header_names(provider: &Provider) -> Vec<&'static str> {
+    match provider {
+        Provider::Stripe => vec![stripe::SIGNATURE_HEADER],
+        Provider::GitHub => vec![github::SIGNATURE_HEADER],
+        Provider::Shopify => vec![shopify::SIGNATURE_HEADER],
+        Provider::Slack => vec![slack::SIGNATURE_HEADER, slack::TIMESTAMP_HEADER],
+        Provider::Square => vec![square::SIGNATURE_HEADER],
+        Provider::Twilio => vec![twilio::SIGNATURE_HEADER],
+        Provider::Discord => {
+            vec![discord::SIGNATURE_HEADER, discord::TIMESTAMP_HEADER]
+        }
+        Provider::Linear => vec![linear::SIGNATURE_HEADER],
+        Provider::StandardWebhooks => vec![
+            standard_webhooks::ID_HEADER,
+            standard_webhooks::TIMESTAMP_HEADER,
+            standard_webhooks::SIGNATURE_HEADER,
+        ],
+        Provider::Custom(scheme) => {
+            let mut names = vec![scheme.signature_header];
+            if let Some(timestamp) = scheme.timestamp_header {
+                names.push(timestamp);
+            }
+            names
+        }
+        Provider::PayPal | Provider::SendGrid | Provider::Zoom | Provider::Dropbox => Vec::new(),
+    }
+}
+
 /// Verifies that a webhook request was sent by `provider` and was not tampered
 /// with in transit.
 ///

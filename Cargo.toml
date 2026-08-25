@@ -11,13 +11,31 @@ exclude = ["/fuzz"]
 
 [dependencies]
 base64 = "0.23.1"
+bytes = { version = "1.12.1", optional = true }
 ed25519-dalek = "3.0.0"
 hex = "0.4.3"
 hmac = "0.13.0"
 http = { version = "1.5.0", optional = true }
+http-body = { version = "1.1.0", optional = true }
+http-body-util = { version = "0.1.5", optional = true }
 sha1 = "0.11.0"
 sha2 = "0.11.0"
 subtle = "2.6.1"
+tower-layer = { version = "0.3.3", optional = true }
+tower-service = { version = "0.3.3", optional = true }
 
 [features]
 http = ["dep:http"]
+# Generic `tower::Layer`/`Service` middleware (works with axum routers too).
+tower = [
+    "dep:bytes",
+    "dep:http",
+    "dep:http-body",
+    "dep:http-body-util",
+    "dep:tower-layer",
+    "dep:tower-service",
+]
+
+[dev-dependencies]
+futures-executor = "0.3.34"
+tower = { version = "0.5.3", features = ["util"] }
