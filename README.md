@@ -105,6 +105,9 @@ webhook-verify = { version = "0.1", features = ["http"] }
 
 # generic tower middleware (works with axum routers too)
 webhook-verify = { version = "0.1", features = ["tower"] }
+
+# actix-web 4 extractor + header bridge
+webhook-verify = { version = "0.1", features = ["actix"] }
 ```
 
 With the `http` feature enabled, any `http::HeaderMap` (from axum, tower, or
@@ -146,14 +149,41 @@ let svc = layer.clone().layer(my_handler_service);
 
 ### Actix Web
 
-Planned — tracked separately; actix-web 4's internal `http` 0.2 types need
-their own header bridge rather than reusing the crate's `http` 1.x impl.
+Enable the `actix` feature and register a `WebhookConfig` on your app; the
+`VerifiedBody` extractor then verifies the signature and hands your handler
+the exact raw bytes:
+
+```rust,ignore
+use actix_web::{App, HttpResponse, web};
+use webhook_verify::actix::{VerifiedBody, WebhookConfig};
+use webhook_verify::{Provider, Secret};
+
+App::new()
+    .app_data(WebhookConfig::new(Provider::GitHub, Secret::new(secret)))
+    .route(
+        "/webhooks/github",
+        web::post().to(|body: VerifiedBody| async move {
+            // `body` is the exact wire payload, already verified.
+            HttpResponse::Ok().finish()
+        }),
+    );
+```
+
+Because actix-web 4 reads the body only during extraction, `VerifiedBody`
+captures it *before* anything else can touch it — do **not** also take
+`web::Json<T>` in the same handler (extractors run left-to-right and `Json`
+would consume the body first); deserialize from `body`'s exact bytes instead.
+Requests whose scheme headers arrive duplicated with conflicting values are
+rejected with `400` before verification (spec §4.4). Failure statuses match
+the tower table above. A guard is intentionally not provided: guards run
+before the body is read, but verification requires those bytes.
 
 > ⚠️ **Raw body required.** All frameworks buffer and re-parse JSON by
 > default, which changes byte-for-byte content (key ordering, whitespace).
-> The tower adapter captures the exact bytes off the wire before anything
-> else touches them; if you call `verify()` directly instead, make sure you
-> pass those same untouched bytes.
+> The tower adapter and actix extractor capture the exact bytes off the wire
+> before anything else touches them; if you call `verify()` directly instead,
+> make sure you pass those same untouched bytes (with the `http` feature for
+> axum/tower/hyper maps, or the bridge provided by the `actix` feature).
 
 ## Security notes
 

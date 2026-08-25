@@ -578,7 +578,7 @@ mod tests {
             .body(TestBody::new(Bytes::from_static(GITHUB_BODY)))
             .unwrap_or_else(|_| unreachable!("static parts build a valid request"));
         let svc =
-            VerifyLayer::new(Provider::Custom(scheme.clone()), Secret::new("k")).layer(EchoLen);
+            VerifyLayer::new(Provider::Custom(scheme), Secret::new("k")).layer(EchoLen);
         block_on(async {
             let response = svc.oneshot(ambiguous).await.unwrap_or_else(|error| panic!("{error}"));
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
