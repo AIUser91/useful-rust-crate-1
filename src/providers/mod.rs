@@ -7,6 +7,7 @@
 
 mod custom;
 mod discord;
+mod dropbox;
 mod github;
 mod linear;
 mod shopify;
@@ -59,7 +60,7 @@ pub enum Provider {
     Linear,
     /// Zoom (`X-Zm-Signature`, HMAC-SHA256 with timestamp).
     Zoom,
-    /// Dropbox (`X-Dropbox-Signature`, HMAC-SHA256 over URL + body).
+    /// Dropbox (`X-Dropbox-Signature`, HMAC-SHA256 over the raw body).
     Dropbox,
     /// Standard Webhooks spec (`webhook-*` headers; Svix, Clerk, Resend, ...).
     StandardWebhooks,
@@ -94,6 +95,7 @@ pub(crate) fn signature_header_names(provider: &Provider) -> Vec<&'static str> {
             vec![discord::SIGNATURE_HEADER, discord::TIMESTAMP_HEADER]
         }
         Provider::Linear => vec![linear::SIGNATURE_HEADER],
+        Provider::Dropbox => vec![dropbox::SIGNATURE_HEADER],
         Provider::Zoom => vec![zoom::SIGNATURE_HEADER, zoom::TIMESTAMP_HEADER],
         Provider::StandardWebhooks => vec![
             standard_webhooks::ID_HEADER,
@@ -107,7 +109,7 @@ pub(crate) fn signature_header_names(provider: &Provider) -> Vec<&'static str> {
             }
             names
         }
-        Provider::PayPal | Provider::SendGrid | Provider::Dropbox => Vec::new(),
+        Provider::PayPal | Provider::SendGrid => Vec::new(),
     }
 }
 
@@ -143,8 +145,9 @@ pub fn verify(
             standard_webhooks::verify(headers, raw_body, secret, &options)
         }
         Provider::Twilio => twilio::verify(headers, raw_body, secret, &options),
+        Provider::Dropbox => dropbox::verify(headers, raw_body, secret, &options),
         Provider::Custom(scheme) => custom::verify(&scheme, headers, raw_body, secret, &options),
-        Provider::PayPal | Provider::SendGrid | Provider::Dropbox => {
+        Provider::PayPal | Provider::SendGrid => {
             Err(VerifyError::UnsupportedProvider)
         }
     }

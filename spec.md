@@ -204,6 +204,16 @@ body, multi-value headers, etc.).
 - Algorithm: HMAC-SHA256, **base64**-encoded (not hex — a common bug source)
 - No timestamp in the signature scheme.
 
+### Dropbox
+
+Source: <https://www.dropbox.com/developers/reference/webhooks> ("Webhooks"
+documentation, signature verification guidance and Python example code).
+
+- Header: `X-Dropbox-Signature: <hex_hmac>`
+- Signed string: raw body bytes, unmodified
+- Algorithm: HMAC-SHA256, hex-encoded
+- No timestamp in the signature scheme (`max_age` has no effect).
+
 ### Linear
 
 - Header: `linear-signature: <hex_hmac>`
@@ -325,11 +335,10 @@ events") and Zoom's official sample app
   docs do not define a recommended window; the timestamp exists so receivers
   *can* reject stale deliveries.
 
-### Linear / Dropbox
+### Linear
 
-- Standard single-secret HMAC-SHA256 schemes, hex or base64 per provider
-  documentation; each gets its own row in the vector table but no special
-  logic beyond header name / encoding / prefix differences already modeled
+- Standard single-secret HMAC-SHA256 scheme, hex-encoded; no prefix, no
+  timestamp. No special logic beyond header name differences already modeled
   by `CustomScheme`.
 
 ### Standard Webhooks spec
