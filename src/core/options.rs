@@ -102,6 +102,27 @@ impl VerifyOptions {
         self
     }
 
+    /// Sets [`VerifyOptions::max_age`], the maximum allowed clock skew for
+    /// providers whose scheme signs a timestamp. `None` disables the check
+    /// (not recommended); the default is `Some(Duration::from_secs(300))`.
+    ///
+    /// Providers that do not sign timestamps document explicitly that this
+    /// option has no effect on them (see `spec.md` §3).
+    #[must_use]
+    pub fn with_max_age(mut self, max_age: Option<Duration>) -> Self {
+        self.max_age = max_age;
+        self
+    }
+
+    /// Sets [`VerifyOptions::clock`], the source of "now" used for replay
+    /// protection. `None` uses real system time. Injectable for deterministic
+    /// tests of timestamp-based providers.
+    #[must_use]
+    pub fn with_clock(mut self, clock: Option<Arc<dyn Clock>>) -> Self {
+        self.clock = clock;
+        self
+    }
+
     /// Resolves "now" from the injected clock, falling back to system time.
     #[must_use]
     pub fn now(&self) -> SystemTime {
@@ -198,5 +219,37 @@ mod tests {
         let debug = format!("{opts:?}");
         assert!(!debug.contains("s3cr3t-message"));
         assert!(debug.contains("form_params_count: Some(1)"));
+    }
+
+    #[test]
+    fn builder_sets_max_age() {
+        let opts = VerifyOptions::default().with_max_age(Some(Duration::from_secs(600)));
+        assert_eq!(opts.max_age, Some(Duration::from_secs(600)));
+    }
+
+    #[test]
+    fn builder_disables_max_age() {
+        let opts = VerifyOptions::default().with_max_age(None);
+        assert!(opts.max_age.is_none());
+    }
+
+    #[test]
+    fn builder_sets_clock() {
+        let fixed = SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+        let opts = VerifyOptions::default().with_clock(Some(Arc::new(FixedClock(fixed))));
+        assert_eq!(opts.now(), fixed);
+    }
+
+    #[test]
+    fn builder_disables_clock() {
+        // Start with an injected clock, then clear it.
+        let fixed = SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+        let opts = VerifyOptions::default()
+            .with_clock(Some(Arc::new(FixedClock(fixed))))
+            .with_clock(None);
+        // With no clock, `now()` falls back to system time — just verify it
+        // doesn't panic and the clock field is None.
+        assert!(opts.clock.is_none());
+        let _ = opts.now();
     }
 }
