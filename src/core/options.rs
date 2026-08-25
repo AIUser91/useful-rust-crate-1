@@ -24,6 +24,7 @@ impl Clock for SystemClock {
 }
 
 /// Tuning knobs for [`crate::verify()`].
+#[must_use]
 #[derive(Clone)]
 pub struct VerifyOptions {
     /// Maximum allowed age between a signed timestamp and "now", for providers
@@ -77,7 +78,6 @@ impl Default for VerifyOptions {
 
 impl VerifyOptions {
     /// Sets [`VerifyOptions::request_url`], for URL-scoped schemes.
-    #[must_use]
     pub fn with_request_url(mut self, url: impl Into<String>) -> Self {
         self.request_url = Some(url.into());
         self
@@ -86,7 +86,6 @@ impl VerifyOptions {
     /// Sets [`VerifyOptions::form_params`], for schemes that sign parsed form
     /// fields (currently Twilio). Order does not matter; fields are sorted
     /// into the signing order here.
-    #[must_use]
     pub fn with_form_params<I, K, V>(mut self, params: I) -> Self
     where
         I: IntoIterator<Item = (K, V)>,
@@ -108,7 +107,6 @@ impl VerifyOptions {
     ///
     /// Providers that do not sign timestamps document explicitly that this
     /// option has no effect on them (see `spec.md` §3).
-    #[must_use]
     pub fn with_max_age(mut self, max_age: Option<Duration>) -> Self {
         self.max_age = max_age;
         self
@@ -117,7 +115,6 @@ impl VerifyOptions {
     /// Sets [`VerifyOptions::clock`], the source of "now" used for replay
     /// protection. `None` uses real system time. Injectable for deterministic
     /// tests of timestamp-based providers.
-    #[must_use]
     pub fn with_clock(mut self, clock: Option<Arc<dyn Clock>>) -> Self {
         self.clock = clock;
         self

@@ -33,6 +33,7 @@ use crate::core::secret::Secret;
 /// listed so the API surface matches `spec.md` §2 and stays additive as
 /// providers ship; calling [`verify()`] with one returns
 /// [`VerifyError::UnsupportedProvider`] (fail-closed).
+#[must_use]
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Provider {
