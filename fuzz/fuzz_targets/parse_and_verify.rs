@@ -21,6 +21,7 @@ const IMPLEMENTED: &[Provider] = &[
     Provider::Shopify,
     Provider::Slack,
     Provider::Linear,
+    Provider::Dropbox,
     // Square needs VerifyOptions::request_url to get past its context check
     // and into the signature path.
     Provider::Square,
