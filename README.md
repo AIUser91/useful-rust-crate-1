@@ -235,7 +235,7 @@ previously-accepted requests are treated as breaking (major version bump),
 except where required to fix a genuine security defect, which will be
 called out explicitly in the changelog and a security advisory.
 
-MSRV: latest stable minus 2 releases, checked in CI.
+MSRV: **1.85** (first Rust release with edition 2024 support), checked in CI.
 
 ## Contributing
 
