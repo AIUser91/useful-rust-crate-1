@@ -9,12 +9,12 @@ use std::fmt;
 ///
 /// `Debug` and `Display` print `Secret(**redacted**)` only. The inner value is
 /// deliberately not readable through the public API.
+#[must_use]
 #[derive(Clone, Default)]
 pub struct Secret(String);
 
 impl Secret {
     /// Creates a secret from any string-like value.
-    #[must_use]
     pub fn new(value: impl Into<String>) -> Self {
         Self(value.into())
     }
