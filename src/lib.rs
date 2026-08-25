@@ -49,5 +49,8 @@
 mod core;
 mod providers;
 
+#[cfg(feature = "tower")]
+pub mod tower;
+
 pub use crate::core::{Clock, HeaderMap, Secret, SystemClock, VerifyError, VerifyOptions};
 pub use crate::providers::{CustomScheme, Encoding, HashAlg, Provider, verify};

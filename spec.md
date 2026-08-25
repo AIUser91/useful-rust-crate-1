@@ -357,7 +357,11 @@ ambiguity).
    in CI (see §6).
 4. **Reject on ambiguity, not accept.** If a header is present multiple
    times with different values, or a required header is malformed, return
-   an error — never fall back to "treat as valid" behavior.
+   an error — never fall back to "treat as valid" behavior. The first-match
+   `HeaderMap` lookup cannot see duplicates, so framework adapters (the
+   `tower` feature) check the raw header map against the provider's
+   scheme-relevant signature headers before verifying; identical repeats are
+   not ambiguous and verify normally.
 5. **No panics on attacker-controlled input.** Every parsing path
    (`base64::decode`, `hex::decode`, header splitting, integer parsing of
    timestamps) must return `Result`, not `unwrap()`/`expect()`, and this is

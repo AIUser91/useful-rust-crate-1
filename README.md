@@ -103,8 +103,8 @@ webhook-verify = "0.1"
 # verify straight against http::HeaderMap (axum, tower, hyper, ...)
 webhook-verify = { version = "0.1", features = ["http"] }
 
-# optional framework adapters
-webhook-verify = { version = "0.1", features = ["axum"] }
+# generic tower middleware (works with axum routers too)
+webhook-verify = { version = "0.1", features = ["tower"] }
 ```
 
 With the `http` feature enabled, any `http::HeaderMap` (from axum, tower, or
@@ -112,38 +112,48 @@ hyper requests) implements `HeaderMap` and can be passed to `verify()` directly.
 
 ## Framework adapters
 
-### Axum
+### Tower (also Axum)
+
+`webhook-verify::tower::VerifyLayer` is a generic `tower::Layer`. It buffers
+the request body as raw bytes, rejects requests whose signature headers arrive
+duplicated with conflicting values (`400`, see spec §4.4), verifies with
+`verify()`, and forwards the exact buffered bytes downstream — handlers can
+then deserialize freely. Verification failures never reach your handler:
+
+| Failure class | Status |
+|---|---|
+| Missing / malformed signature headers | `400 Bad Request` |
+| Signature mismatch / stale timestamp | `401 Unauthorized` |
+| Operator misconfiguration | `500 Internal Server Error` |
+
+Plain tower stacks receive `Request<Bytes>`; axum users get their own body
+type back automatically via type inference:
 
 ```rust
-use axum::{routing::post, Router};
-use webhook_verify::axum::WebhookVerifierLayer;
+use webhook_verify::{Provider, Secret};
+use webhook_verify::tower::VerifyLayer;
 
-let app = Router::new()
-    .route("/webhooks/stripe", post(handle_stripe))
-    .layer(WebhookVerifierLayer::new(Provider::Stripe, secret));
+let layer = VerifyLayer::new(Provider::Stripe, secret);
+
+// Plain tower: inner service takes http::Request<Bytes>.
+let svc = layer.clone().layer(my_handler_service);
+
+// Axum: same layer, inferred as axum::body::Body.
+// Router::new()
+//     .route("/webhooks/stripe", post(handle_stripe))
+//     .layer(layer);
 ```
 
 ### Actix Web
 
-```rust
-App::new().route(
-    "/webhooks/github",
-    web::post()
-        .guard(webhook_verify::actix::verified(Provider::GitHub, secret))
-        .to(handle_github),
-)
-```
-
-### Tower
-
-`webhook-verify::tower::VerifyLayer` implements `tower::Layer` directly for
-anyone composing their own middleware stack.
+Planned — tracked separately; actix-web 4's internal `http` 0.2 types need
+their own header bridge rather than reusing the crate's `http` 1.x impl.
 
 > ⚠️ **Raw body required.** All frameworks buffer and re-parse JSON by
 > default, which changes byte-for-byte content (key ordering, whitespace).
-> Verification must run against the *exact* bytes the provider sent, before
-> any JSON deserialization. Each adapter documents how to capture the raw
-> body correctly for that framework.
+> The tower adapter captures the exact bytes off the wire before anything
+> else touches them; if you call `verify()` directly instead, make sure you
+> pass those same untouched bytes.
 
 ## Security notes
 
