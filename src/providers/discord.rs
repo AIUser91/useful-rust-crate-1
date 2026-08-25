@@ -46,6 +46,7 @@ use crate::core::VerifyOptions;
 use crate::core::crypto::verify_ed25519;
 use crate::core::error::VerifyError;
 use crate::core::headers::HeaderMap;
+use crate::core::replay::{check_replay, parse_timestamp};
 use crate::core::secret::Secret;
 
 /// The header carrying the hex-encoded Ed25519 signature.
@@ -80,7 +81,7 @@ pub(crate) fn verify(
 
     let public_key = decode_public_key(secret.as_bytes())?;
     let provided_signature = parse_signature(signature_value)?;
-    let timestamp = parse_timestamp(timestamp_raw)?;
+    let timestamp = parse_timestamp(TIMESTAMP_HEADER, timestamp_raw)?;
 
     // Signed message is `{timestamp_as_sent}{raw_body}`; the raw timestamp
     // substring is reused verbatim so whatever was actually signed is what
@@ -137,63 +138,6 @@ fn parse_signature(value: &str) -> Result<Vec<u8>, VerifyError> {
     }
 
     Ok(bytes)
-}
-
-/// Parses the timestamp header into a unix-seconds `u64`.
-fn parse_timestamp(value: &str) -> Result<u64, VerifyError> {
-    if value.is_empty() {
-        return Err(VerifyError::MalformedHeader {
-            header: TIMESTAMP_HEADER,
-            reason: "header is empty",
-        });
-    }
-
-    value.parse::<u64>().map_err(|_| {
-        if value.starts_with('-') || !value.bytes().all(|b| b.is_ascii_digit()) {
-            VerifyError::MalformedHeader {
-                header: TIMESTAMP_HEADER,
-                reason: "timestamp is not a valid unix timestamp",
-            }
-        } else {
-            // All digits but too large for u64: still malformed, just a more
-            // specific reason for operators debugging oversized garbage.
-            VerifyError::MalformedHeader {
-                header: TIMESTAMP_HEADER,
-                reason: "timestamp overflows unix seconds",
-            }
-        }
-    })
-}
-
-/// Enforces `|now - t| <= max_age` when replay protection is enabled.
-///
-/// Mirrors Slack's semantics: the window is symmetric because the timestamp
-/// is covered by the signature, and sub-second precision of "now" is
-/// truncated.
-fn check_replay(timestamp: u64, options: &VerifyOptions) -> Result<(), VerifyError> {
-    let Some(max_age) = options.max_age else {
-        return Ok(());
-    };
-
-    // A clock before the UNIX epoch yields 0 here, which fail-closed rejects
-    // any realistic delivery timestamp rather than accepting it silently.
-    let now_unix = options
-        .now()
-        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-
-    // `abs_diff` avoids overflow/panic for absurd attacker-chosen values in
-    // either direction.
-    let skew_secs = now_unix.abs_diff(timestamp);
-    if skew_secs > max_age.as_secs() {
-        return Err(VerifyError::TimestampOutOfTolerance {
-            skew: std::time::Duration::from_secs(skew_secs),
-            max_age,
-        });
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

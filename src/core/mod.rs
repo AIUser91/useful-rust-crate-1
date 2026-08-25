@@ -9,6 +9,7 @@ pub(crate) mod crypto;
 pub(crate) mod error;
 pub(crate) mod headers;
 pub(crate) mod options;
+pub(crate) mod replay;
 pub(crate) mod secret;
 
 pub use error::VerifyError;
