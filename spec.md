@@ -335,12 +335,6 @@ events") and Zoom's official sample app
   docs do not define a recommended window; the timestamp exists so receivers
   *can* reject stale deliveries.
 
-### Linear
-
-- Standard single-secret HMAC-SHA256 scheme, hex-encoded; no prefix, no
-  timestamp. No special logic beyond header name differences already modeled
-  by `CustomScheme`.
-
 ### Standard Webhooks spec
 
 Source: <https://www.standardwebhooks.com> and the canonical spec at
