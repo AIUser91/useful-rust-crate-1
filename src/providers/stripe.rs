@@ -31,6 +31,7 @@ use crate::core::VerifyOptions;
 use crate::core::crypto::verify_hmac_sha256;
 use crate::core::error::VerifyError;
 use crate::core::headers::HeaderMap;
+use crate::core::replay::check_replay;
 use crate::core::secret::Secret;
 
 /// The header carrying Stripe's signature.
@@ -174,36 +175,6 @@ fn parse_header(value: &str) -> Result<ParsedHeader<'_>, VerifyError> {
         timestamp_raw,
         signatures,
     })
-}
-
-/// Enforces `|now - t| <= max_age` when replay protection is enabled.
-///
-/// Sub-second precision of `now` is truncated; tolerance windows are minutes-
-/// scale so this cannot flip an in-window request out of the window.
-fn check_replay(timestamp: u64, options: &VerifyOptions) -> Result<(), VerifyError> {
-    let Some(max_age) = options.max_age else {
-        return Ok(());
-    };
-
-    // A clock before the UNIX epoch yields 0 here, which fail-closed rejects
-    // any realistic delivery timestamp rather than accepting it silently.
-    let now_unix = options
-        .now()
-        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-
-    // `abs_diff` avoids overflow/panic for absurd attacker-chosen values in
-    // either direction.
-    let skew_secs = now_unix.abs_diff(timestamp);
-    if skew_secs > max_age.as_secs() {
-        return Err(VerifyError::TimestampOutOfTolerance {
-            skew: std::time::Duration::from_secs(skew_secs),
-            max_age,
-        });
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

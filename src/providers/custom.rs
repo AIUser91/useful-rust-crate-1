@@ -52,8 +52,8 @@ use crate::core::VerifyOptions;
 use crate::core::crypto::{verify_hmac_sha1, verify_hmac_sha256, verify_hmac_sha512};
 use crate::core::error::VerifyError;
 use crate::core::headers::HeaderMap;
+use crate::core::replay::{check_replay, parse_timestamp};
 use crate::core::secret::Secret;
-use std::time::{Duration, SystemTime};
 
 /// HMAC hash algorithms available to a [`CustomScheme`] (`spec.md` §2.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -190,10 +190,11 @@ pub(crate) fn verify(
         return Err(VerifyError::SignatureMismatch);
     }
 
-    match (timestamp, options.max_age) {
-        (Some(timestamp), Some(max_age)) => check_replay(timestamp, max_age, options),
-        _ => Ok(()),
+    if let Some(timestamp) = timestamp {
+        check_replay(timestamp, options)?;
     }
+
+    Ok(())
 }
 
 /// Decodes the signature header value per the scheme's prefix and encoding.
@@ -245,51 +246,6 @@ fn parse_signature(
     }
 
     Ok(bytes)
-}
-
-/// Parses a timestamp header into unix seconds; mirrors the built-in
-/// timestamped schemes' error mapping.
-fn parse_timestamp(header: &'static str, value: &str) -> Result<u64, VerifyError> {
-    if value.is_empty() {
-        return Err(VerifyError::MalformedHeader {
-            header,
-            reason: "header is empty",
-        });
-    }
-
-    value.parse::<u64>().map_err(|_| {
-        if value.starts_with('-') || !value.bytes().all(|b| b.is_ascii_digit()) {
-            VerifyError::MalformedHeader {
-                header,
-                reason: "timestamp is not a valid unix timestamp",
-            }
-        } else {
-            VerifyError::MalformedHeader {
-                header,
-                reason: "timestamp overflows unix seconds",
-            }
-        }
-    })
-}
-
-/// Enforces `|now - t| <= max_age`; identical semantics to the built-in
-/// timestamped schemes (symmetric window, closed at the edges).
-fn check_replay(timestamp: u64, max_age: Duration, options: &VerifyOptions) -> Result<(), VerifyError> {
-    let now_unix = options
-        .now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-
-    let skew_secs = now_unix.abs_diff(timestamp);
-    if skew_secs > max_age.as_secs() {
-        return Err(VerifyError::TimestampOutOfTolerance {
-            skew: Duration::from_secs(skew_secs),
-            max_age,
-        });
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

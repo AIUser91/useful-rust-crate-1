@@ -42,6 +42,7 @@ use crate::core::VerifyOptions;
 use crate::core::crypto::verify_hmac_sha256;
 use crate::core::error::VerifyError;
 use crate::core::headers::HeaderMap;
+use crate::core::replay::{check_replay, parse_timestamp};
 use crate::core::secret::Secret;
 
 /// The header carrying the unique webhook message id.
@@ -98,7 +99,7 @@ pub(crate) fn verify(
 
     let key = decode_secret(secret.as_bytes())?;
     let provided_signatures = parse_signatures(signature_value)?;
-    let timestamp = parse_timestamp(timestamp_raw)?;
+    let timestamp = parse_timestamp(TIMESTAMP_HEADER, timestamp_raw)?;
 
     // Signed string is `{id_as_sent}.{timestamp_as_sent}.{raw_body}`; both
     // header substrings are reused verbatim so whatever was actually signed
@@ -207,62 +208,6 @@ fn parse_signatures(value: &str) -> Result<Vec<Vec<u8>>, VerifyError> {
     }
 
     Ok(signatures)
-}
-
-/// Parses the timestamp header into a unix-seconds `u64`.
-fn parse_timestamp(value: &str) -> Result<u64, VerifyError> {
-    if value.is_empty() {
-        return Err(VerifyError::MalformedHeader {
-            header: TIMESTAMP_HEADER,
-            reason: "header is empty",
-        });
-    }
-
-    value.parse::<u64>().map_err(|_| {
-        if value.starts_with('-') || !value.bytes().all(|b| b.is_ascii_digit()) {
-            VerifyError::MalformedHeader {
-                header: TIMESTAMP_HEADER,
-                reason: "timestamp is not a valid unix timestamp",
-            }
-        } else {
-            // All digits but too large for u64: still malformed, just a more
-            // specific reason for operators debugging oversized garbage.
-            VerifyError::MalformedHeader {
-                header: TIMESTAMP_HEADER,
-                reason: "timestamp overflows unix seconds",
-            }
-        }
-    })
-}
-
-/// Enforces `|now - t| <= max_age` when replay protection is enabled.
-///
-/// Mirrors the reference libraries, which reject timestamps both too old and
-/// too new relative to the tolerance window.
-fn check_replay(timestamp: u64, options: &VerifyOptions) -> Result<(), VerifyError> {
-    let Some(max_age) = options.max_age else {
-        return Ok(());
-    };
-
-    // A clock before the UNIX epoch yields 0 here, which fail-closed rejects
-    // any realistic delivery timestamp rather than accepting it silently.
-    let now_unix = options
-        .now()
-        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-
-    // `abs_diff` avoids overflow/panic for absurd attacker-chosen values in
-    // either direction.
-    let skew_secs = now_unix.abs_diff(timestamp);
-    if skew_secs > max_age.as_secs() {
-        return Err(VerifyError::TimestampOutOfTolerance {
-            skew: std::time::Duration::from_secs(skew_secs),
-            max_age,
-        });
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]
