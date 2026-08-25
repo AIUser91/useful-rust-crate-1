@@ -147,6 +147,32 @@ let svc = layer.clone().layer(my_handler_service);
 //     .layer(layer);
 ```
 
+#### Axum
+
+Axum routers are tower services, so `VerifyLayer` is the supported axum
+integration — no separate feature or module is needed:
+
+```rust,ignore
+use axum::{routing::post, Router};
+use webhook_verify::{Provider, Secret};
+use webhook_verify::tower::VerifyLayer;
+
+let app = Router::new()
+    .route("/webhooks/github", post(handle_github))
+    .layer(VerifyLayer::new(Provider::GitHub, Secret::new(secret)));
+```
+
+The layer buffers and verifies the raw body before routing, so handlers can
+use extractors freely (`Json`, `Bytes`, ...) — the bytes they receive are
+already verified.
+
+> ⚠️ **If you bypass the middleware**, verify before any extractor touches the
+> body. Extractors run top-down and body-consuming ones (`Json`, `Bytes`,
+> `String`) drain the request; once they have run, the original wire bytes are
+> gone. Capture the body first (e.g. `Bytes` as your first extractor), call
+> `verify()` on those exact bytes with an `http::HeaderMap` (the `http`
+> feature), and only then deserialize a copy.
+
 ### Actix Web
 
 Enable the `actix` feature and register a `WebhookConfig` on your app; the

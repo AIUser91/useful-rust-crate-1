@@ -80,6 +80,18 @@
 //!     .layer(webhook_verify::tower::VerifyLayer::new(Provider::GitHub, secret));
 //! ```
 //!
+//! # Axum: verifying without the middleware
+//!
+//! If you call [`crate::verify()`] directly instead of using this layer,
+//! verify *before* any extractor consumes the request. Extractors run
+//! top-down and body-consuming ones (`Json`, `Bytes`, `String`) drain the
+//! request; once they have run, the original wire bytes are gone and any
+//! signature computed over re-serialized data will (correctly) fail. Capture
+//! the body first (`Bytes` as your first extractor), verify those exact
+//! bytes against an `http::HeaderMap` via the `http` feature, then
+//! deserialize from a copy. Prefer the layer: it makes this ordering
+//! impossible to get wrong.
+//!
 //! # Errors
 //!
 //! Transport-level failures while reading the request body (e.g. the client
