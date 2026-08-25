@@ -72,14 +72,15 @@ pub enum Provider {
 /// Header names that carry signing material for `provider`, per its row in
 /// `spec.md` §3.
 ///
-/// Used by framework adapters (behind the `tower` feature) to reject requests
-/// whose signature headers arrive duplicated with conflicting values — see the
-/// ambiguity contract on [`crate::HeaderMap`] and `spec.md` §4.4, which the
-/// first-match-only lookup cannot detect on its own.
+/// Used by framework adapters (behind the `tower`/`actix` features) to reject
+/// requests whose signature headers arrive duplicated with conflicting values
+/// — see the ambiguity contract on [`crate::HeaderMap`] and `spec.md` §4.4,
+/// which the first-match-only lookup cannot detect on its own.
 ///
 /// Returns an empty list for providers that are not implemented yet; their
 /// verification fails closed with [`VerifyError::UnsupportedProvider`]
 /// regardless.
+#[cfg(any(feature = "tower", feature = "actix"))]
 pub(crate) fn signature_header_names(provider: &Provider) -> Vec<&'static str> {
     match provider {
         Provider::Stripe => vec![stripe::SIGNATURE_HEADER],

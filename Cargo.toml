@@ -10,6 +10,7 @@ repository = "https://github.com/AIUser91/useful-rust-crate-1"
 exclude = ["/fuzz"]
 
 [dependencies]
+actix-web = { version = "4", optional = true, default-features = false }
 base64 = "0.23.1"
 bytes = { version = "1.12.1", optional = true }
 ed25519-dalek = "3.0.0"
@@ -26,10 +27,16 @@ tower-service = { version = "0.3.3", optional = true }
 
 [features]
 http = ["dep:http"]
+# actix-web 4 adapter: extractor + header bridge (actix's internal `http`
+# 0.2 types need their own impl of the crate's `HeaderMap` trait). Contains
+# no verification logic of its own.
+actix = ["dep:actix-web"]
 # Generic `tower::Layer`/`Service` middleware (works with axum routers too).
+# Enables the `http` *feature* (not just the dependency) so the
+# `HeaderMap` impl for `http::HeaderMap` is compiled in.
 tower = [
+    "http",
     "dep:bytes",
-    "dep:http",
     "dep:http-body",
     "dep:http-body-util",
     "dep:tower-layer",
@@ -39,3 +46,6 @@ tower = [
 [dev-dependencies]
 futures-executor = "0.3.34"
 tower = { version = "0.5.3", features = ["util"] }
+# Test-only: the `macros` feature provides `#[actix_web::test]`; the library
+# dependency itself is default-feature-free, so this only widens test builds.
+actix-web = { version = "4", features = ["macros"] }
