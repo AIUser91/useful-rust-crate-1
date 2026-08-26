@@ -195,6 +195,7 @@ impl<S, B> Layer<S> for VerifyLayer<B> {
 }
 
 /// The [`Service`] produced by [`VerifyLayer`]; see the [module docs](self).
+#[must_use]
 pub struct VerifyMiddleware<S, B = Bytes> {
     inner: S,
     config: Config,
