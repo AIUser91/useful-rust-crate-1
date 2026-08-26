@@ -56,6 +56,7 @@ use crate::core::secret::Secret;
 use base64::Engine;
 
 /// HMAC hash algorithms available to a [`CustomScheme`] (`spec.md` §2.2).
+#[must_use]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HashAlg {
     /// HMAC-SHA256; 32-byte digest.
@@ -80,6 +81,7 @@ impl HashAlg {
 }
 
 /// Wire encoding of the signature in its header (`spec.md` §2.2).
+#[must_use]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Encoding {
     /// Lower/uppercase hexadecimal (both accepted by the decoder).
@@ -98,6 +100,7 @@ pub enum Encoding {
 ///
 /// [`PartialEq`] compares the declarative configuration only; `signed_string`
 /// is excluded — function pointers have no meaningful or reliable equality.
+#[must_use]
 #[derive(Debug, Clone, Copy)]
 pub struct CustomScheme {
     /// HMAC hash algorithm the sender uses.
