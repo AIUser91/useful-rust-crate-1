@@ -14,6 +14,7 @@ use std::time::Duration;
 /// out-of-band misconfiguration). Callers that log differently per class can
 /// match on the variants — but both classes are "reject the request"
 /// outcomes. Never treat a malformed header as "skip verification".
+#[must_use]
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerifyError {
