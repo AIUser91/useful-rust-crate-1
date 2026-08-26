@@ -47,6 +47,8 @@
 
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
+use std::fmt;
+
 use crate::core::VerifyOptions;
 use crate::core::crypto::{verify_hmac_sha1, verify_hmac_sha256, verify_hmac_sha512};
 use crate::core::error::VerifyError;
@@ -70,6 +72,16 @@ pub enum HashAlg {
     Sha512,
 }
 
+impl fmt::Display for HashAlg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HashAlg::Sha256 => f.write_str("SHA-256"),
+            HashAlg::Sha1 => f.write_str("SHA-1"),
+            HashAlg::Sha512 => f.write_str("SHA-512"),
+        }
+    }
+}
+
 impl HashAlg {
     /// Digest output length in bytes; decoded signatures must match it.
     fn digest_len(self) -> usize {
@@ -90,6 +102,15 @@ pub enum Encoding {
     Hex,
     /// Standard base64 alphabet with padding.
     Base64,
+}
+
+impl fmt::Display for Encoding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Encoding::Hex => f.write_str("hex"),
+            Encoding::Base64 => f.write_str("base64"),
+        }
+    }
 }
 
 /// A user-configured HMAC verification scheme for providers not yet built in
