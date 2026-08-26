@@ -783,7 +783,7 @@ mod tests {
     fn bad_encoding_errors_distinctly() {
         let cases: Vec<String> = vec![
             // Not hex at all.
-            format!("sha256=zzzz"),
+            "sha256=zzzz".to_string(),
             // Valid hex but wrong digest length for SHA-256 (20-byte SHA-1 size).
             "sha256=deadbeefdeadbeefdeadbeefdeadbeefdeadbeef".to_string(),
         ];

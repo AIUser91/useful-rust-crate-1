@@ -424,9 +424,9 @@ mod tests {
     #[test]
     fn bad_encoding_errors_distinctly() {
         let cases: Vec<String> = vec![
-            format!("v0=zzzz"),
-            format!("v0=abc"),
-            format!("v0=deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"),
+            "v0=zzzz".to_string(),
+            "v0=abc".to_string(),
+            "v0=deadbeefdeadbeefdeadbeefdeadbeefdeadbeef".to_string(),
         ];
         for value in cases {
             let result = verify_with(

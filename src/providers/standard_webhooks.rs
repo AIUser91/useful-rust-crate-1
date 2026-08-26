@@ -719,11 +719,11 @@ mod tests {
     fn bad_encoding_errors_distinctly() {
         let cases: Vec<String> = vec![
             // Not base64 at all.
-            format!("v1,zzzz"),
+            "v1,zzzz".to_string(),
             // Valid base64 but odd-length payload.
-            format!("v1,abc"),
+            "v1,abc".to_string(),
             // Valid base64 but not 32 bytes (SHA-1 length).
-            format!("v1,HcZO8dIixs4vWL0zK+0uBpwLgW0="),
+            "v1,HcZO8dIixs4vWL0zK+0uBpwLgW0=".to_string(),
             // One good sig must not mask a malformed sibling element.
             format!("v1,{SIGNATURE} v1,nothex"),
         ];
