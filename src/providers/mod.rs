@@ -152,6 +152,22 @@ pub(crate) fn signature_header_names(provider: &Provider) -> Vec<&'static str> {
 /// * `options` — tolerance/clock knobs; see [`VerifyOptions`].
 ///
 /// Errors are structured ([`VerifyError`]) and never contain secret material.
+///
+/// # Errors
+///
+/// Returns [`VerifyError::MissingHeader`] when a required signature header is
+/// absent, [`VerifyError::MalformedHeader`] when a header is present but
+/// unparseable, and [`VerifyError::BadEncoding`] when a hex or base64 value
+/// fails to decode. [`VerifyError::SignatureMismatch`] is returned when the
+/// decoded signature does not match the expected value. Providers with
+/// timestamp-based replay protection return
+/// [`VerifyError::TimestampOutOfTolerance`] when the signed timestamp is too
+/// old. [`VerifyError::UnsupportedProvider`] is returned for providers that
+/// have no implementation yet (PayPal, SendGrid). [`VerifyError::InvalidSecret`]
+/// is returned when the secret is not in the format the provider requires.
+/// [`VerifyError::MissingContext`] is returned when provider-specific request
+/// context (e.g. Square's notification URL) was not supplied via
+/// [`VerifyOptions`].
 pub fn verify(
     provider: Provider,
     headers: &dyn HeaderMap,
@@ -220,6 +236,19 @@ pub fn verify(
 ///     Default::default(),
 /// );
 /// ```
+///
+/// # Errors
+///
+/// Structural errors ([`VerifyError::MissingHeader`],
+/// [`VerifyError::MalformedHeader`], [`VerifyError::BadEncoding`],
+/// [`VerifyError::UnsupportedProvider`], [`VerifyError::InvalidSecret`],
+/// [`VerifyError::MissingContext`]) are returned immediately regardless of
+/// how many secrets remain, because they are deterministic across all
+/// secrets. [`VerifyError::TimestampOutOfTolerance`] is also returned
+/// immediately when encountered, since the timestamp is secret-independent.
+/// [`VerifyError::SignatureMismatch`] is returned only after *all* secrets
+/// have been tried without a match, to avoid leaking information about
+/// which key was closest via timing differences.
 pub fn verify_any(
     provider: Provider,
     headers: &dyn HeaderMap,
