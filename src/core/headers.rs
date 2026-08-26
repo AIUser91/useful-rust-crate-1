@@ -1,7 +1,7 @@
 //! The [`HeaderMap`] abstraction: lets `verify()` work against any framework's
 //! header representation.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 /// Case-insensitive, read-only header lookup.
 ///
@@ -15,6 +15,12 @@ use std::collections::BTreeMap;
 /// duplicates belongs to the caller/adapter layer, since this trait exposes
 /// only first-match lookup. Framework adapters are expected to reject
 /// duplicated signature headers before calling [`crate::verify()`].
+///
+/// # `HashMap` caveat
+///
+/// For [`HashMap`] the inherent exact-case `get` shadows this trait method in
+/// method-call position. Pass the map to `HeaderMap::get(&map, name)` to get
+/// the case-insensitive lookup this crate relies on.
 ///
 /// # `BTreeMap` caveat
 ///
@@ -70,6 +76,14 @@ impl HeaderMap for BTreeMap<String, String> {
     }
 }
 
+impl HeaderMap for HashMap<String, String> {
+    fn get(&self, name: &str) -> Option<&str> {
+        self.iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.as_str())
+    }
+}
+
 #[cfg(feature = "http")]
 impl HeaderMap for ::http::HeaderMap {
     fn get(&self, name: &str) -> Option<&str> {
@@ -87,7 +101,7 @@ impl HeaderMap for ::http::HeaderMap {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashMap};
 
     use super::HeaderMap;
 
@@ -106,6 +120,18 @@ mod tests {
             ("A".to_string(), "second".to_string()),
         ];
         assert_eq!(headers.get("A"), Some("first"));
+    }
+
+    #[test]
+    fn hash_map_is_case_insensitive() {
+        let mut headers = HashMap::new();
+        headers.insert("Webhook-Signature".to_string(), "v1,aa".to_string());
+        assert_eq!(HeaderMap::get(&headers, "webhook-signature"), Some("v1,aa"));
+        assert_eq!(
+            HeaderMap::get(&headers, "WEBHOOK-SIGNATURE"),
+            Some("v1,aa")
+        );
+        assert_eq!(HeaderMap::get(&headers, "missing"), None);
     }
 
     #[test]
