@@ -66,6 +66,19 @@ jobs:
             exit 1
           fi
 
+  fuzz-build:
+    name: fuzz build (nightly)
+    runs-on: ubuntu-latest
+    # spec §6: cargo fuzz build (build-only in normal CI; timed fuzz runs
+    # in a scheduled nightly job). Requires nightly for libfuzzer-sys.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+      - run: cargo fuzz build
+
   semver-checks:
     name: semver-checks
     runs-on: ubuntu-latest
