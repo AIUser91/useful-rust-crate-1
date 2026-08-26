@@ -12,17 +12,22 @@ once, correctly, for every major provider, behind a single API.
 ```rust
 use webhook_verify::{verify, Provider, Secret};
 
+let headers: Vec<(String, String)> = vec![
+    ("Stripe-Signature".to_string(), "t=1234567890,v1=abc...".to_string()),
+];
+let raw_body = b"{\"id\": \"evt_test\"}";
+
 let result = verify(
     Provider::Stripe,
     &headers,        // anything implementing HeaderMap
-    &raw_body,        // &[u8] — MUST be the untouched request body
-    &Secret::new(std::env::var("STRIPE_WEBHOOK_SECRET")?),
+    raw_body,         // &[u8] — MUST be the untouched request body
+    &Secret::new(std::env::var("STRIPE_WEBHOOK_SECRET").unwrap()),
     Default::default(),
 );
 
 match result {
     Ok(()) => { /* trusted: safe to process the event */ }
-    Err(e) => { /* reject with 400/401, log e.kind() */ }
+    Err(e) => { /* reject with 400/401, log e */ }
 }
 ```
 
