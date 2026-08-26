@@ -443,11 +443,11 @@ mod tests {
     fn bad_encoding_errors_distinctly() {
         let cases: Vec<String> = vec![
             // Not hex at all.
-            format!("v0=zzzz"),
+            "v0=zzzz".to_string(),
             // Valid hex but odd number of digits.
-            format!("v0=abc"),
+            "v0=abc".to_string(),
             // Valid hex but not 32 bytes (SHA-1 length).
-            format!("v0=deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"),
+            "v0=deadbeefdeadbeefdeadbeefdeadbeefdeadbeef".to_string(),
         ];
         for value in cases {
             let result = verify_with(
