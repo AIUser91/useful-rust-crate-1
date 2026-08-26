@@ -127,10 +127,7 @@ mod tests {
         let mut headers = HashMap::new();
         headers.insert("Webhook-Signature".to_string(), "v1,aa".to_string());
         assert_eq!(HeaderMap::get(&headers, "webhook-signature"), Some("v1,aa"));
-        assert_eq!(
-            HeaderMap::get(&headers, "WEBHOOK-SIGNATURE"),
-            Some("v1,aa")
-        );
+        assert_eq!(HeaderMap::get(&headers, "WEBHOOK-SIGNATURE"), Some("v1,aa"));
         assert_eq!(HeaderMap::get(&headers, "missing"), None);
     }
 
