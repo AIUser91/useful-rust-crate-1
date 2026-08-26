@@ -111,6 +111,7 @@ use crate::{
 /// Register it once per app (or per scoped webhook route) with
 /// `App::app_data(...)`. Requests arriving at routes without a registered
 /// config fail closed with `500 Internal Server Error`.
+#[must_use]
 #[derive(Clone)]
 pub struct WebhookConfig {
     provider: Provider,
@@ -132,7 +133,6 @@ impl fmt::Debug for WebhookConfig {
 
 impl WebhookConfig {
     /// Verifies `provider` signatures using the shared `secret`.
-    #[must_use]
     pub fn new(provider: Provider, secret: Secret) -> Self {
         Self::with_options(provider, secret, VerifyOptions::default())
     }
@@ -140,7 +140,6 @@ impl WebhookConfig {
     /// Like [`WebhookConfig::new`], with explicit [`VerifyOptions`]
     /// (timestamp tolerance, injected clock, URL-scoped schemes such as
     /// Square/Twilio).
-    #[must_use]
     pub fn with_options(provider: Provider, secret: Secret, options: VerifyOptions) -> Self {
         Self {
             provider,
@@ -155,6 +154,7 @@ impl WebhookConfig {
 ///
 /// Produced by the [`FromRequest`] implementation; see the [module docs](self)
 /// for the security contract and status-code table.
+#[must_use]
 pub struct VerifiedBody(Bytes);
 
 impl VerifiedBody {
