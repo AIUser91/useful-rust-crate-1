@@ -10,7 +10,7 @@ env:
 
 jobs:
   test:
-    name: test / clippy (${{ matrix.rust }})
+    name: test (${{ matrix.rust }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -38,6 +38,16 @@ jobs:
       # Stable-only on purpose: lint sets differ between toolchains, and the
       # bar this repo holds itself to (AGENTS.md §6) is defined against stable.
       - run: cargo clippy --all-features -- -D warnings
+
+  fmt:
+    name: format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
 
   secret-leak-grep:
     name: no secret material in logs/panics
