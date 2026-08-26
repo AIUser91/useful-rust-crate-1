@@ -101,7 +101,7 @@ impl HeaderMap for ::http::HeaderMap {
 
 #[cfg(test)]
 mod tests {
-use std::collections::{BTreeMap, HashMap};
+    use std::collections::{BTreeMap, HashMap};
 
     use super::HeaderMap;
 
