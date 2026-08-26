@@ -199,6 +199,7 @@ enum Rejection {
 
 /// Rejection produced when webhook verification fails; renders as an
 /// empty-bodied response whose status follows the [module table](self#status-codes).
+#[must_use]
 #[derive(Debug)]
 pub struct WebhookVerificationError(Rejection);
 
