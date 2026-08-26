@@ -145,8 +145,8 @@ pub struct CustomScheme {
     pub prefix: Option<&'static str>,
     /// Builds the exact byte string the sender HMACs, from the request
     /// headers and the **raw** body bytes. Read any additional signed inputs
-    /// (timestamps, URL context) out of `headers` or captured configuration;
-    /// never re-serialize or normalize `raw_body`.
+    /// (timestamps, URL context) out of `headers`; never re-serialize or
+    /// normalize `raw_body`.
     pub signed_string: fn(&dyn HeaderMap, &[u8]) -> Vec<u8>,
 }
 
