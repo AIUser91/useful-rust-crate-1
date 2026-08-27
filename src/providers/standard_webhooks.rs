@@ -214,11 +214,11 @@ fn parse_signatures(value: &str) -> Result<Vec<Vec<u8>>, VerifyError> {
 mod tests {
     use super::{ID_HEADER, SECRET_PREFIX, SIGNATURE_HEADER, TIMESTAMP_HEADER};
     use crate::core::error::VerifyError;
-    use crate::core::options::{Clock, VerifyOptions};
+    use crate::core::options::VerifyOptions;
     use crate::core::secret::Secret;
+    use crate::test_helpers::clocked_at;
     use crate::verify;
-    use std::sync::Arc;
-    use std::time::{Duration, SystemTime};
+    use std::time::Duration;
 
     /// Signing secret from the official test suite of the Standard Webhooks
     /// Python library (<https://github.com/standard-webhooks/standard-webhooks/blob/main/libraries/python/tests/test_webhooks.py>,
@@ -272,29 +272,6 @@ mod tests {
     /// `MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSwBr` form (same official test,
     /// "needs two padding" case).
     const UNPADDED_SECRET_25B_SIGNATURE: &str = "yK2tMbA6BHPrMEJ1lLv7UlJJbgFoqGenJkiajZ29evg=";
-
-    #[derive(Debug)]
-    struct FixedClock(SystemTime);
-
-    impl Clock for FixedClock {
-        fn now(&self) -> SystemTime {
-            self.0
-        }
-    }
-
-    fn epoch(secs: u64) -> SystemTime {
-        SystemTime::UNIX_EPOCH + Duration::from_secs(secs)
-    }
-
-    /// Options pinning "now" to a fixed instant for deterministic tests.
-    fn clocked_at(secs: u64, max_age: Option<Duration>) -> VerifyOptions {
-        VerifyOptions {
-            max_age,
-            clock: Some(Arc::new(FixedClock(epoch(secs)))),
-            request_url: None,
-            form_params: None,
-        }
-    }
 
     fn verify_with(
         body: &[u8],

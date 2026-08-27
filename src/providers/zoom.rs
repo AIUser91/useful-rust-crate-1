@@ -116,11 +116,11 @@ fn parse_signature(value: &str) -> Result<Vec<u8>, VerifyError> {
 mod tests {
     use super::{SIGNATURE_HEADER, TIMESTAMP_HEADER};
     use crate::core::error::VerifyError;
-    use crate::core::options::{Clock, VerifyOptions};
+    use crate::core::options::VerifyOptions;
     use crate::core::secret::Secret;
+    use crate::test_helpers::clocked_at;
     use crate::verify;
-    use std::sync::Arc;
-    use std::time::{Duration, SystemTime};
+    use std::time::Duration;
 
     /// Signing secret used to construct local test vectors.
     const SECRET: &str = "zoom_webhook_secret";
@@ -141,29 +141,6 @@ mod tests {
     /// `printf 'v0:1739923528:héllo, 🦀 world!' | openssl dgst -sha256 -hmac "zoom_webhook_secret"`
     const UNICODE_BODY_SIGNATURE: &str =
         "acdb345ab730d87b815b7f8c6d280399029aec15304310a172224d016aa9dff5";
-
-    #[derive(Debug)]
-    struct FixedClock(SystemTime);
-
-    impl Clock for FixedClock {
-        fn now(&self) -> SystemTime {
-            self.0
-        }
-    }
-
-    fn epoch(secs: u64) -> SystemTime {
-        SystemTime::UNIX_EPOCH + Duration::from_secs(secs)
-    }
-
-    /// Options pinning "now" to a fixed instant for deterministic tests.
-    fn clocked_at(secs: u64, max_age: Option<Duration>) -> VerifyOptions {
-        VerifyOptions {
-            max_age,
-            clock: Some(Arc::new(FixedClock(epoch(secs)))),
-            request_url: None,
-            form_params: None,
-        }
-    }
 
     fn zoom_headers(timestamp: u64, signature: &str) -> Vec<(String, String)> {
         vec![

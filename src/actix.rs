@@ -358,6 +358,7 @@ mod tests {
     use super::*;
     // Aliased: a plain `use ..::test` would make `#[test]` resolve to the
     // actix module instead of the built-in attribute.
+    use crate::test_helpers::{FixedClock, epoch};
     use actix_web::{App, HttpResponse, http, test as aw_test, web};
 
     /// GitHub's documented example vector
@@ -524,21 +525,10 @@ mod tests {
 
     // --- replay protection through the adapter -------------------------------
 
-    #[derive(Debug)]
-    struct FixedClock(std::time::SystemTime);
-
-    impl crate::Clock for FixedClock {
-        fn now(&self) -> std::time::SystemTime {
-            self.0
-        }
-    }
-
     #[actix_web::test]
     async fn stale_timestamp_is_unauthorized_through_adapter() {
-        let signed_at =
-            std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(SLACK_TIMESTAMP);
         // "Now" ten minutes after signing: outside the default 300s window.
-        let late = signed_at + std::time::Duration::from_secs(600);
+        let late = epoch(SLACK_TIMESTAMP + 600);
 
         let app = aw_test::init_service(
             App::new()

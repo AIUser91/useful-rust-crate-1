@@ -143,12 +143,12 @@ fn parse_signature(value: &str) -> Result<Vec<u8>, VerifyError> {
 mod tests {
     use super::{PUBLIC_KEY_LEN_BYTES, SIGNATURE_HEADER, SIGNATURE_LEN_BYTES, TIMESTAMP_HEADER};
     use crate::core::error::VerifyError;
-    use crate::core::options::{Clock, VerifyOptions};
+    use crate::core::options::VerifyOptions;
     use crate::core::secret::Secret;
+    use crate::test_helpers::clocked_at;
     use crate::verify;
     use ed25519_dalek::Signer;
-    use std::sync::Arc;
-    use std::time::{Duration, SystemTime};
+    use std::time::Duration;
 
     /// Deterministic seed for locally constructed vectors. Fixed constants —
     /// not RNG output — so the vectors are reproducible forever; see the
@@ -171,29 +171,6 @@ mod tests {
             hex::encode(signing_key.verifying_key().as_bytes()),
             hex::encode(signature.to_bytes()),
         )
-    }
-
-    #[derive(Debug)]
-    struct FixedClock(SystemTime);
-
-    impl Clock for FixedClock {
-        fn now(&self) -> SystemTime {
-            self.0
-        }
-    }
-
-    fn epoch(secs: u64) -> SystemTime {
-        SystemTime::UNIX_EPOCH + Duration::from_secs(secs)
-    }
-
-    /// Options pinning "now" to a fixed instant for deterministic tests.
-    fn clocked_at(secs: u64, max_age: Option<Duration>) -> VerifyOptions {
-        VerifyOptions {
-            max_age,
-            clock: Some(Arc::new(FixedClock(epoch(secs)))),
-            request_url: None,
-            form_params: None,
-        }
     }
 
     fn verify_with(

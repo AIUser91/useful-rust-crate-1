@@ -276,12 +276,12 @@ fn parse_signature(scheme: &CustomScheme, value: &str) -> Result<Vec<u8>, Verify
 mod tests {
     use super::{CustomScheme, Encoding, HashAlg};
     use crate::core::error::VerifyError;
-    use crate::core::options::{Clock, VerifyOptions};
+    use crate::core::options::VerifyOptions;
     use crate::core::secret::Secret;
     use crate::providers::Provider;
+    use crate::test_helpers::clocked_at;
     use crate::verify;
-    use std::sync::Arc;
-    use std::time::{Duration, SystemTime};
+    use std::time::Duration;
 
     /// Signing secret from the worked example in Slack's official docs
     /// (<https://docs.slack.dev/authentication/verifying-requests-from-slack>);
@@ -339,28 +339,6 @@ mod tests {
             encoding: Encoding::Hex,
             prefix: Some("sha256="),
             signed_string: ts_signed_string,
-        }
-    }
-
-    #[derive(Debug)]
-    struct FixedClock(SystemTime);
-
-    impl Clock for FixedClock {
-        fn now(&self) -> SystemTime {
-            self.0
-        }
-    }
-
-    fn epoch(secs: u64) -> SystemTime {
-        SystemTime::UNIX_EPOCH + Duration::from_secs(secs)
-    }
-
-    fn clocked_at(secs: u64, max_age: Option<Duration>) -> VerifyOptions {
-        VerifyOptions {
-            max_age,
-            clock: Some(Arc::new(FixedClock(epoch(secs)))),
-            request_url: None,
-            form_params: None,
         }
     }
 

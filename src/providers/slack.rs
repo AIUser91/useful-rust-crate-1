@@ -116,11 +116,11 @@ fn parse_signature(value: &str) -> Result<Vec<u8>, VerifyError> {
 mod tests {
     use super::{SIGNATURE_HEADER, TIMESTAMP_HEADER};
     use crate::core::error::VerifyError;
-    use crate::core::options::{Clock, VerifyOptions};
+    use crate::core::options::VerifyOptions;
     use crate::core::secret::Secret;
+    use crate::test_helpers::clocked_at;
     use crate::verify;
-    use std::sync::Arc;
-    use std::time::{Duration, SystemTime};
+    use std::time::Duration;
 
     /// Signing secret from the worked example in Slack's official docs
     /// (<https://docs.slack.dev/authentication/verifying-requests-from-slack>).
@@ -146,29 +146,6 @@ mod tests {
     /// `"héllo, 🦀 world!"` (unicode boundary case).
     const UNICODE_BODY_SIGNATURE: &str =
         "1200938ebc09f4bb238038a89d972e3d1090cf006340a74e8312a69b4e5e46d5";
-
-    #[derive(Debug)]
-    struct FixedClock(SystemTime);
-
-    impl Clock for FixedClock {
-        fn now(&self) -> SystemTime {
-            self.0
-        }
-    }
-
-    fn epoch(secs: u64) -> SystemTime {
-        SystemTime::UNIX_EPOCH + Duration::from_secs(secs)
-    }
-
-    /// Options pinning "now" to a fixed instant for deterministic tests.
-    fn clocked_at(secs: u64, max_age: Option<Duration>) -> VerifyOptions {
-        VerifyOptions {
-            max_age,
-            clock: Some(Arc::new(FixedClock(epoch(secs)))),
-            request_url: None,
-            form_params: None,
-        }
-    }
 
     fn slack_headers(timestamp: u64, signature: &str) -> [(String, String); 2] {
         [
