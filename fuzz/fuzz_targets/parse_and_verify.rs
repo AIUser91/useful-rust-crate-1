@@ -40,8 +40,14 @@ const IMPLEMENTED: &[Provider] = &[
 /// A well-formed secret for each provider's scheme, so the fuzzer reaches the
 /// signature-construction/comparison paths and not just early secret errors.
 /// (Only Standard Webhooks parses its key format; the rest accept any string.)
+///
+/// Deliberately spelled *without* the `whsec_` prefix: the prefix is optional
+/// per the Standard Webhooks spec (see `src/providers/standard_webhooks.rs`),
+/// and the prefixed form's `whsec_<base64>` spelling matches GitHub's
+/// Stripe-secret pattern and trips secret scanning (issue #13). Dropping the
+/// prefix yields an identical decoded key.
 const WELL_FORMED_SECRET: &str =
-    "whsec_MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+    "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
 
 fn attempt(
     provider: Provider,
