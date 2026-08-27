@@ -70,18 +70,10 @@ pub(crate) fn check_replay(timestamp: u64, options: &VerifyOptions) -> Result<()
 mod tests {
     use super::{check_replay, parse_timestamp};
     use crate::VerifyError;
-    use crate::core::options::{Clock, VerifyOptions};
+    use crate::core::options::VerifyOptions;
+    use crate::test_helpers::{FixedClock, epoch};
     use std::sync::Arc;
-    use std::time::{Duration, SystemTime};
-
-    #[derive(Debug)]
-    struct FixedClock(SystemTime);
-
-    impl Clock for FixedClock {
-        fn now(&self) -> SystemTime {
-            self.0
-        }
-    }
+    use std::time::Duration;
 
     // --- parse_timestamp -----------------------------------------------------
 
@@ -142,7 +134,7 @@ mod tests {
     #[test]
     fn valid_timestamp_within_window() {
         let ts = 1_700_000_000u64;
-        let now = SystemTime::UNIX_EPOCH + Duration::from_secs(ts + 100);
+        let now = epoch(ts + 100);
         let opts = VerifyOptions {
             max_age: Some(Duration::from_secs(300)),
             clock: Some(Arc::new(FixedClock(now))),
@@ -154,7 +146,7 @@ mod tests {
     #[test]
     fn stale_timestamp_is_rejected() {
         let ts = 1_700_000_000u64;
-        let now = SystemTime::UNIX_EPOCH + Duration::from_secs(ts + 600);
+        let now = epoch(ts + 600);
         let opts = VerifyOptions {
             max_age: Some(Duration::from_secs(300)),
             clock: Some(Arc::new(FixedClock(now))),
@@ -169,7 +161,7 @@ mod tests {
     #[test]
     fn future_timestamp_is_rejected() {
         let ts = 1_700_000_000u64;
-        let now = SystemTime::UNIX_EPOCH + Duration::from_secs(ts - 600);
+        let now = epoch(ts - 600);
         let opts = VerifyOptions {
             max_age: Some(Duration::from_secs(300)),
             clock: Some(Arc::new(FixedClock(now))),
@@ -194,7 +186,7 @@ mod tests {
     #[test]
     fn boundary_exactly_at_max_age_is_accepted() {
         let ts = 1_700_000_000u64;
-        let now = SystemTime::UNIX_EPOCH + Duration::from_secs(ts + 300);
+        let now = epoch(ts + 300);
         let opts = VerifyOptions {
             max_age: Some(Duration::from_secs(300)),
             clock: Some(Arc::new(FixedClock(now))),

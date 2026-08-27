@@ -340,6 +340,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_helpers::{FixedClock, epoch};
     use ::http_body_util::Full;
     use ::tower::ServiceExt;
     use futures_executor::block_on;
@@ -544,15 +545,6 @@ mod tests {
 
     // --- replay protection through the adapter -------------------------------
 
-    #[derive(Debug)]
-    struct FixedClock(std::time::SystemTime);
-
-    impl crate::Clock for FixedClock {
-        fn now(&self) -> std::time::SystemTime {
-            self.0
-        }
-    }
-
     #[test]
     fn stale_timestamp_is_unauthorized_through_adapter() {
         let request = Request::builder()
@@ -561,10 +553,8 @@ mod tests {
             .body(TestBody::new(Bytes::from_static(SLACK_BODY)))
             .unwrap_or_else(|_| unreachable!("static parts build a valid request"));
 
-        let signed_at =
-            std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(SLACK_TIMESTAMP);
         // "Now" ten minutes after signing: outside the default 300s window.
-        let late = signed_at + std::time::Duration::from_secs(600);
+        let late = epoch(SLACK_TIMESTAMP + 600);
         let svc = VerifyLayer::with_options(
             Provider::Slack,
             Secret::new(SLACK_SECRET),

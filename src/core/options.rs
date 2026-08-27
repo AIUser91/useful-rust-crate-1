@@ -147,18 +147,10 @@ impl fmt::Debug for VerifyOptions {
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
-    use std::time::{Duration, SystemTime};
+    use std::time::Duration;
 
-    use super::{Clock, VerifyOptions};
-
-    #[derive(Debug)]
-    struct FixedClock(SystemTime);
-
-    impl Clock for FixedClock {
-        fn now(&self) -> SystemTime {
-            self.0
-        }
-    }
+    use super::VerifyOptions;
+    use crate::test_helpers::{FixedClock, epoch};
 
     #[test]
     fn default_is_five_minutes_without_injected_clock() {
@@ -169,7 +161,7 @@ mod tests {
 
     #[test]
     fn injected_clock_is_used_for_now() {
-        let fixed = SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+        let fixed = epoch(1_700_000_000);
         let opts = VerifyOptions {
             max_age: Some(Duration::from_secs(300)),
             clock: Some(Arc::new(FixedClock(fixed))),
@@ -232,7 +224,7 @@ mod tests {
 
     #[test]
     fn builder_sets_clock() {
-        let fixed = SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+        let fixed = epoch(1_700_000_000);
         let opts = VerifyOptions::default().with_clock(Some(Arc::new(FixedClock(fixed))));
         assert_eq!(opts.now(), fixed);
     }
@@ -240,7 +232,7 @@ mod tests {
     #[test]
     fn builder_disables_clock() {
         // Start with an injected clock, then clear it.
-        let fixed = SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+        let fixed = epoch(1_700_000_000);
         let opts = VerifyOptions::default()
             .with_clock(Some(Arc::new(FixedClock(fixed))))
             .with_clock(None);

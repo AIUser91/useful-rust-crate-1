@@ -181,11 +181,11 @@ fn parse_header(value: &str) -> Result<ParsedHeader<'_>, VerifyError> {
 mod tests {
     use super::SIGNATURE_HEADER;
     use crate::core::error::VerifyError;
-    use crate::core::options::{Clock, VerifyOptions};
+    use crate::core::options::VerifyOptions;
     use crate::core::secret::Secret;
+    use crate::test_helpers::clocked_at;
     use crate::verify;
-    use std::sync::Arc;
-    use std::time::{Duration, SystemTime};
+    use std::time::Duration;
 
     const SECRET: &str = "whsec_test_secret";
     const BODY: &[u8] = b"{\"id\":\"evt_test_webhook\",\"object\":\"event\"}";
@@ -205,29 +205,6 @@ mod tests {
     /// Locally constructed over `"héllo, 🦀 world!"` (unicode boundary case).
     const UNICODE_BODY_SIGNATURE: &str =
         "30d79a01345bc49a3460f5c4c0323dd4a6f8efd5828440954d17fda456e43da5";
-
-    #[derive(Debug)]
-    struct FixedClock(SystemTime);
-
-    impl Clock for FixedClock {
-        fn now(&self) -> SystemTime {
-            self.0
-        }
-    }
-
-    fn epoch(secs: u64) -> SystemTime {
-        SystemTime::UNIX_EPOCH + Duration::from_secs(secs)
-    }
-
-    /// Options pinning "now" to a fixed instant for deterministic tests.
-    fn clocked_at(secs: u64, max_age: Option<Duration>) -> VerifyOptions {
-        VerifyOptions {
-            max_age,
-            clock: Some(Arc::new(FixedClock(epoch(secs)))),
-            request_url: None,
-            form_params: None,
-        }
-    }
 
     fn stripe_headers(timestamp: u64, signature: &str) -> [(String, String); 1] {
         [(

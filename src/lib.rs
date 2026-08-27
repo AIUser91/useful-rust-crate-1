@@ -49,6 +49,9 @@
 mod core;
 mod providers;
 
+#[cfg(test)]
+mod test_helpers;
+
 #[cfg(feature = "actix")]
 pub mod actix;
 
