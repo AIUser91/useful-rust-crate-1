@@ -222,7 +222,6 @@ mod tests {
 
     /// Deterministically derives an Ed25519 keypair from `seed` and signs
     /// `message`; used to build local test vectors without pulling in a RNG.
-    #[cfg(test)]
     fn sign_with_seed(seed: [u8; 32], message: &[u8]) -> ([u8; 32], Vec<u8>) {
         use ed25519_dalek::Signer;
 
