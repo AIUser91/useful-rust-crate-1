@@ -7,6 +7,17 @@ rust-version = "1.85"
 description = "One function to verify inbound webhook signatures from major providers"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/AIUser91/useful-rust-crate-1"
+readme = "README.md"
+keywords = [
+    "webhook",
+    "webhooks",
+    "verification",
+    "signature",
+    "hmac",
+    "ed25519",
+    "security",
+]
+categories = ["web-programming", "cryptography", "authentication"]
 exclude = ["/fuzz"]
 
 [dependencies]
