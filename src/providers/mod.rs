@@ -256,13 +256,12 @@ pub fn verify_any(
     secrets: &[Secret],
     options: VerifyOptions,
 ) -> Result<(), VerifyError> {
-    let mut last_err = VerifyError::SignatureMismatch;
     for secret in secrets {
         match verify(provider, headers, raw_body, secret, options.clone()) {
+            // A match on any active key is enough during rotation.
             Ok(()) => return Ok(()),
-            Err(VerifyError::SignatureMismatch) => {
-                last_err = VerifyError::SignatureMismatch;
-            }
+            // Keep trying the remaining keys when one simply doesn't match.
+            Err(VerifyError::SignatureMismatch) => {}
             Err(other) => {
                 // Structural errors (MissingHeader, MalformedHeader,
                 // BadEncoding, etc.) are deterministic across all secrets —
@@ -276,7 +275,7 @@ pub fn verify_any(
     // All secrets exhausted with SignatureMismatch: return the same error
     // regardless of how many were tried, to avoid leaking information
     // about which key was "closest" via timing differences.
-    Err(last_err)
+    Err(VerifyError::SignatureMismatch)
 }
 
 #[cfg(test)]
