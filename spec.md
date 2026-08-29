@@ -59,7 +59,9 @@ impl Secret {
 }
 // Debug/Display for Secret print "Secret(**redacted**)" only.
 
-pub struct VerifyOptions {
+pub struct VerifyOptions {  // #[non_exhaustive]: configure via Default + the
+                            //   `with_*` builders so new fields (e.g. §7
+                            //   `verifying_material`) stay non-breaking
     /// Maximum allowed age between the signed timestamp and "now",
     /// for providers whose scheme includes a timestamp. `None` disables
     /// the check (not recommended). Default: Some(Duration::from_secs(300)).
@@ -495,7 +497,7 @@ A provider implementation is not mergeable until it has:
       EcdsaP256PublicKey(Vec<u8>),
   }
 
-  pub struct VerifyOptions {
+  pub struct VerifyOptions {  // #[non_exhaustive]
       // ... existing fields ...
       /// Verification material for providers whose scheme checks a
       /// signature against a configured public key/certificate rather
