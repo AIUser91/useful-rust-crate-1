@@ -21,7 +21,7 @@ let result = verify(
     Provider::Stripe,
     &headers,        // anything implementing HeaderMap
     raw_body,         // &[u8] — MUST be the untouched request body
-    &Secret::new(std::env::var("STRIPE_WEBHOOK_SECRET").unwrap()),
+    &Secret::new(std::env::var("STRIPE_WEBHOOK_SECRET").expect("STRIPE_WEBHOOK_SECRET must be set")),
     Default::default(),
 );
 

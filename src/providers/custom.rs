@@ -14,9 +14,12 @@
 //! structured errors instead of panicking. What is *not* covered is choosing
 //! the scheme itself — a mis-described scheme (e.g. signing a re-serialized
 //! body instead of raw bytes) will verify nothing useful. Configure
-//! `signed_string` to reproduce the provider's documented recipe exactly,
-//! and pass [`VerifyOptions::request_url`] contents into your closure via
-//! captured state if the scheme signs the URL.
+//! `signed_string` to reproduce the provider's documented recipe exactly.
+//! `signed_string` is a plain `fn`, so it cannot capture values from its
+//! environment; if the scheme signs request context (such as a URL), read it
+//! out of `headers` inside the function — for
+//! [`VerifyOptions::request_url`] contents, construct your scheme headers to
+//! carry the URL.
 //!
 //! # Example
 //!

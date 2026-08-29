@@ -86,8 +86,10 @@ pub trait HeaderMap {
     /// Case-insensitive header lookup. Returns the first matching value.
     fn get(&self, name: &str) -> Option<&str>;
 }
-// Blanket impls provided for http::HeaderMap, Vec<(String,String)>,
-// and BTreeMap<String,String> behind feature flags.
+// Blanket impls provided for the built-in collections (Vec<(String,String)>,
+// fixed-size arrays of (String,String) and (&str,&str), BTreeMap<String,String>,
+// HashMap<String,String>), unconditionally; the http::HeaderMap impl is
+// provided behind the "http" feature flag.
 
 pub fn verify(
     provider: Provider,
