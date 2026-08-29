@@ -146,6 +146,28 @@ Design rules for errors:
   disguised as `SignatureMismatch` attack signals; the request is still
   rejected.
 
+#### `verify_any` aggregation (decision record, issue #64)
+
+`verify_any()` iterates a slice of secrets during a rotation window and
+returns `Ok(())` if any one of them verifies. Its error aggregation rules:
+
+- **Structural errors** (`MissingHeader`, `MalformedHeader`, `BadEncoding`,
+  `UnsupportedProvider`, `MissingContext`, `TimestampOutOfTolerance`) are
+  deterministic across all secrets — they occur before any secret-dependent
+  work — so `verify_any` returns them immediately.
+- **`InvalidSecret` is secret-specific, not deterministic.** A key rejected
+  for its own formatting is unusable for the current request, but a later key
+  in the slice may still be correct. `verify_any` therefore *continues*
+  past an `InvalidSecret` rather than aborting, so a rotation slice with one
+  garbled/truncated live key still verifies against the healthy one.
+- On total failure, `verify_any` returns `SignatureMismatch` if at least one
+  key was well-formed but wrong; it returns the first `InvalidSecret` only
+  when *every* key was rejected for its own formatting (an all-garbled
+  configuration is an operator error, not a forgery). Returning
+  `InvalidSecret` in that case cannot help an attacker — a forged request
+  already yields `SignatureMismatch` whenever a usable key exists — and it
+  gives operators an honest signal that their key configuration is broken.
+
 ### 2.2 `CustomScheme`
 
 For providers not yet built in, or self-hosted/internal webhook senders:

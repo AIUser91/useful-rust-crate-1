@@ -644,6 +644,89 @@ mod tests {
     }
 
     #[test]
+    fn verify_any_rotation_succeeds_with_one_garbled_key() {
+        // Issue #64: a rotation slice whose *first* key is undecodable must
+        // still verify against the valid key instead of aborting on the
+        // first InvalidSecret. This is exactly the previously-broken
+        // scenario from the issue:
+        // `[Secret::new("not base64!!"), Secret::new("...base64 key")]`.
+        let secrets = [
+            Secret::new("whsec_this is not base64!!"),
+            Secret::new(SECRET),
+        ];
+        let signature_value = format!("v1,{SIGNATURE}");
+        let timestamp_value = TIMESTAMP.to_string();
+        let result = crate::verify_any(
+            crate::Provider::StandardWebhooks,
+            &[
+                (ID_HEADER, MSG_ID),
+                (SIGNATURE_HEADER, signature_value.as_str()),
+                (TIMESTAMP_HEADER, timestamp_value.as_str()),
+            ],
+            BODY,
+            &secrets,
+            clocked_at(TIMESTAMP, Some(Duration::from_secs(300))),
+        );
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn verify_any_reports_invalid_secret_when_every_key_is_garbled() {
+        // Total failure with *no* usable key at all is an operator-config
+        // error, not a forgery: report the first InvalidSecret (its reason
+        // is deterministic — first garbled key wins).
+        let secrets = [
+            Secret::new("whsec_this is not base64!!"),
+            Secret::new("whsec_===="),
+        ];
+        let signature_value = format!("v1,{SIGNATURE}");
+        let timestamp_value = TIMESTAMP.to_string();
+        let result = crate::verify_any(
+            crate::Provider::StandardWebhooks,
+            &[
+                (ID_HEADER, MSG_ID),
+                (SIGNATURE_HEADER, signature_value.as_str()),
+                (TIMESTAMP_HEADER, timestamp_value.as_str()),
+            ],
+            BODY,
+            &secrets,
+            clocked_at(TIMESTAMP, Some(Duration::from_secs(300))),
+        );
+        assert_eq!(
+            result,
+            Err(VerifyError::InvalidSecret {
+                reason: "secret is not valid standard-alphabet base64 after any `whsec_` prefix",
+            })
+        );
+    }
+
+    #[test]
+    fn verify_any_mixed_garbled_and_mismatched_reports_mismatch() {
+        // One garbled key plus one well-formed-but-wrong key: the signature
+        // genuinely failed against a usable key, so the definitive error is
+        // SignatureMismatch — the garbled key must not be surfaced (or leak
+        // via timing) when any usable key exists.
+        let secrets = [
+            Secret::new("whsec_this is not base64!!"),
+            Secret::new(whsec("MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSX")),
+        ];
+        let signature_value = format!("v1,{SIGNATURE}");
+        let timestamp_value = TIMESTAMP.to_string();
+        let result = crate::verify_any(
+            crate::Provider::StandardWebhooks,
+            &[
+                (ID_HEADER, MSG_ID),
+                (SIGNATURE_HEADER, signature_value.as_str()),
+                (TIMESTAMP_HEADER, timestamp_value.as_str()),
+            ],
+            BODY,
+            &secrets,
+            clocked_at(TIMESTAMP, Some(Duration::from_secs(300))),
+        );
+        assert_eq!(result, Err(VerifyError::SignatureMismatch));
+    }
+
+    #[test]
     fn malformed_signature_header_errors_distinctly() {
         let cases: Vec<(String, VerifyError)> = vec![
             (
