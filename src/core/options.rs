@@ -85,7 +85,7 @@ impl VerifyOptions {
 
     /// Sets [`VerifyOptions::form_params`], for schemes that sign parsed form
     /// fields (currently Twilio). Order does not matter; fields are sorted
-    /// into the signing order here.
+    /// into signing order during verification of Twilio's signed string.
     pub fn with_form_params<I, K, V>(mut self, params: I) -> Self
     where
         I: IntoIterator<Item = (K, V)>,

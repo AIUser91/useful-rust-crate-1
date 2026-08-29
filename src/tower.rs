@@ -64,7 +64,7 @@
 //! assert_eq!(response.status(), 200);
 //! # Ok(())
 //! # }
-//! # run().unwrap();
+//! # run().unwrap_or_else(|error| panic!("example must be self-contained: {error}"));
 //! ```
 //!
 //! # Framework note (downstream body type)
