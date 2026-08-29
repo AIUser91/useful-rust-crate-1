@@ -24,7 +24,22 @@ impl Clock for SystemClock {
 }
 
 /// Tuning knobs for [`crate::verify()`].
+///
+/// `#[non_exhaustive]`: new knobs are expected to arrive (e.g. the
+/// asymmetric `verifying_material` from `spec.md` §7), and adding a field
+/// must never break downstream callers. Outside this crate the fields are
+/// therefore configured only through [`Default`] and the `with_*` builder
+/// methods — struct-literal construction is intentionally unavailable.
+///
+/// ```
+/// use std::time::Duration;
+/// use webhook_verify::VerifyOptions;
+///
+/// let opts = VerifyOptions::default().with_max_age(Some(Duration::from_secs(600)));
+/// assert_eq!(opts.max_age, Some(Duration::from_secs(600)));
+/// ```
 #[must_use]
+#[non_exhaustive]
 #[derive(Clone)]
 pub struct VerifyOptions {
     /// Maximum allowed age between a signed timestamp and "now", for providers
