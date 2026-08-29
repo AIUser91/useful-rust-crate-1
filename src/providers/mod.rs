@@ -200,8 +200,10 @@ pub fn verify(
 /// rotation (e.g. `v1=...,v1=...`). This function accepts a slice of
 /// [`Secret`]s — each representing an active signing key — and returns
 /// `Ok(())` if *any* of them verifies. On total failure it returns
-/// `Err(VerifyError::SignatureMismatch)` regardless of *which* secrets
-/// failed or why (no timing leak about which key was closest).
+/// `Err(VerifyError::SignatureMismatch)` when at least one key was usable
+/// (no timing leak about which key was closest); it returns
+/// `Err(VerifyError::InvalidSecret)` only when *every* key was rejected for
+/// its own formatting.
 ///
 /// For providers whose signing scheme itself embeds multiple signatures
 /// (Stripe's `v1=` list, Standard Webhooks' space-delimited `v1,<sig>`
@@ -241,14 +243,21 @@ pub fn verify(
 ///
 /// Structural errors ([`VerifyError::MissingHeader`],
 /// [`VerifyError::MalformedHeader`], [`VerifyError::BadEncoding`],
-/// [`VerifyError::UnsupportedProvider`], [`VerifyError::InvalidSecret`],
-/// [`VerifyError::MissingContext`]) are returned immediately regardless of
-/// how many secrets remain, because they are deterministic across all
-/// secrets. [`VerifyError::TimestampOutOfTolerance`] is also returned
-/// immediately when encountered, since the timestamp is secret-independent.
-/// [`VerifyError::SignatureMismatch`] is returned only after *all* secrets
-/// have been tried without a match, to avoid leaking information about
-/// which key was closest via timing differences.
+/// [`VerifyError::UnsupportedProvider`], [`VerifyError::MissingContext`])
+/// are returned immediately regardless of how many secrets remain, because
+/// they are deterministic across all secrets.
+/// [`VerifyError::TimestampOutOfTolerance`] is also returned immediately
+/// when encountered, since the timestamp is secret-independent.
+/// [`VerifyError::InvalidSecret`] is *not* returned immediately: a secret
+/// rejected for its own formatting is unusable for this request, but a
+/// later key in the slice may still be correct — which is the point of
+/// iterating during a rotation window. [`VerifyError::SignatureMismatch`]
+/// is returned once every secret has been tried without a match, provided
+/// at least one of them was well-formed; only when *every* secret was
+/// invalid does `verify_any` return the first
+/// [`VerifyError::InvalidSecret`], so an all-garbled configuration is
+/// reported as an operator-configuration error rather than disguised as a
+/// forgery.
 pub fn verify_any(
     provider: Provider,
     headers: &dyn HeaderMap,
@@ -256,25 +265,48 @@ pub fn verify_any(
     secrets: &[Secret],
     options: VerifyOptions,
 ) -> Result<(), VerifyError> {
+    // First InvalidSecret seen, reported only if *every* secret turns out
+    // to be unusable. Not a structural error: it is specific to one secret,
+    // so it must not abort the rotation search (issue #64).
+    let mut first_invalid_secret: Option<VerifyError> = None;
+    // Set once a well-formed key fails to match. A signature that fails
+    // against a usable key is the definitive total-failure signal and takes
+    // precedence over InvalidSecret in the final report.
+    let mut any_well_formed_mismatch = false;
+
     for secret in secrets {
         match verify(provider, headers, raw_body, secret, options.clone()) {
             // A match on any active key is enough during rotation.
             Ok(()) => return Ok(()),
-            // Keep trying the remaining keys when one simply doesn't match.
-            Err(VerifyError::SignatureMismatch) => {}
+            // A well-formed key that simply doesn't match: keep trying the
+            // remaining keys, but remember that the signature failed against
+            // a usable key in case nothing else matches either.
+            Err(VerifyError::SignatureMismatch) => any_well_formed_mismatch = true,
+            // A garbled/undecodable key is unusable for *this* secret only;
+            // keep trying the rest and remember the first rejection in case
+            // none of them are usable either.
+            Err(invalid @ VerifyError::InvalidSecret { .. }) => {
+                first_invalid_secret.get_or_insert(invalid);
+            }
             Err(other) => {
                 // Structural errors (MissingHeader, MalformedHeader,
-                // BadEncoding, etc.) are deterministic across all secrets —
-                // the error occurs before any secret-dependent work. Return
-                // it immediately so callers can distinguish a malformed
-                // request from a forged signature.
+                // BadEncoding, UnsupportedProvider, MissingContext,
+                // TimestampOutOfTolerance) are deterministic across all
+                // secrets — they occur before any secret-dependent work.
+                // Return it immediately so callers can distinguish a
+                // malformed request from a forged signature.
                 return Err(other);
             }
         }
     }
-    // All secrets exhausted with SignatureMismatch: return the same error
-    // regardless of how many were tried, to avoid leaking information
-    // about which key was "closest" via timing differences.
+    // All secrets exhausted without a match. Prefer the definitive
+    // SignatureMismatch once at least one key was usable; report the first
+    // InvalidSecret only when no usable key existed at all.
+    if !any_well_formed_mismatch {
+        if let Some(invalid) = first_invalid_secret {
+            return Err(invalid);
+        }
+    }
     Err(VerifyError::SignatureMismatch)
 }
 
