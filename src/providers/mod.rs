@@ -313,7 +313,29 @@ pub fn verify_any(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::error::VerifyError;
     use crate::core::secret::Secret;
+    use crate::test_helpers::clocked_at;
+    use std::time::Duration;
+
+    /// Locally constructs a Slack `v0=` signature over `v0:{ts}:{body}` with
+    /// the given secret (HMAC-SHA256, hex-encoded) — mirrors the construction
+    /// in `src/providers/slack.rs` (spec.md §3, Slack row). Test-only.
+    fn slack_signature(secret: &str, ts: u64, body: &[u8]) -> String {
+        use hmac::{Hmac, KeyInit, Mac};
+        use sha2::Sha256;
+
+        let mut mac = match Hmac::<Sha256>::new_from_slice(secret.as_bytes()) {
+            Ok(mac) => mac,
+            // Unreachable for a constant test secret (HMAC accepts
+            // arbitrary-length keys); kept panic-free to honor the crate-wide
+            // clippy deny on unwrap/expect.
+            Err(_) => panic!("HMAC-SHA256 with a constant test secret cannot fail"),
+        };
+        mac.update(format!("v0:{ts}:").as_bytes());
+        mac.update(body);
+        hex::encode(mac.finalize().into_bytes())
+    }
 
     /// GitHub's documented example vector
     /// (<https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries>).
@@ -436,6 +458,110 @@ mod tests {
                 Default::default(),
             ),
             Ok(())
+        );
+    }
+
+    #[test]
+    fn verify_any_returns_timestamp_tolerance_immediately_across_secrets() {
+        // spec.md §2.1 / verify_any docs: TimestampOutOfTolerance is
+        // deterministic and secret-independent, so it must be returned
+        // immediately rather than continuing the rotation search. Here the
+        // *last* secret is correct, but the timestamp is stale.
+        let slack_secret = "8f742231b10e8888abcd99yyyzzz85a5";
+        let slack_body = b"token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J";
+        let stale_ts = 1_531_420_618u64;
+        // Sign `v0:{ts}:{body}` with the secret (HMAC-SHA256, hex).
+        let sig = slack_signature(slack_secret, stale_ts, slack_body);
+        let sig_value = format!("v0={sig}");
+        let ts_value = stale_ts.to_string();
+        let headers = [
+            ("X-Slack-Signature", sig_value.as_str()),
+            ("X-Slack-Request-Timestamp", ts_value.as_str()),
+        ];
+
+        // Wall-clock "now" is irrelevant here; use a clock far in the future
+        // so the old timestamp is out of tolerance regardless of real time.
+        let options = clocked_at(stale_ts + 3600, Some(Duration::from_secs(300)));
+
+        // First confirm the single-secret direct call rejects on tolerance.
+        assert!(
+            matches!(
+                verify(
+                    Provider::Slack,
+                    &headers,
+                    slack_body,
+                    &Secret::new(slack_secret),
+                    options.clone(),
+                ),
+                Err(VerifyError::TimestampOutOfTolerance { .. })
+            ),
+            "direct verify must reject a stale timestamp"
+        );
+
+        // Even though the last secret is correct, verify_any must return the
+        // deterministic tolerance error, not Ok(()).
+        let secrets = [
+            Secret::new("wrong-key-1"),
+            Secret::new("wrong-key-2"),
+            Secret::new(slack_secret),
+        ];
+        assert!(matches!(
+            verify_any(Provider::Slack, &headers, slack_body, &secrets, options,),
+            Err(VerifyError::TimestampOutOfTolerance { .. })
+        ));
+    }
+
+    #[test]
+    fn verify_any_multiple_secrets_affect_only_matching_not_timestamp() {
+        // Sanity counterpart: with a *fresh* timestamp the last correct secret
+        // must verify Ok, proving the immediate tolerance return above is due
+        // to time, not to any interaction with the secret slice.
+        let slack_secret = "8f742231b10e8888abcd99yyyzzz85a5";
+        let slack_body = b"token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J";
+        let ts = 1_531_420_618u64;
+        let sig = slack_signature(slack_secret, ts, slack_body);
+        let sig_value = format!("v0={sig}");
+        let ts_value = ts.to_string();
+        let headers = [
+            ("X-Slack-Signature", sig_value.as_str()),
+            ("X-Slack-Request-Timestamp", ts_value.as_str()),
+        ];
+        let options = clocked_at(ts, None);
+
+        let secrets = [
+            Secret::new("wrong-key-1"),
+            Secret::new("wrong-key-2"),
+            Secret::new(slack_secret),
+        ];
+        assert_eq!(
+            verify_any(Provider::Slack, &headers, slack_body, &secrets, options),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn verify_any_all_wrong_secrets_with_fresh_timestamp_is_mismatch() {
+        // Guard against the two tests above accidentally passing because
+        // verify_any returned SignatureMismatch for the wrong reason: fresh
+        // timestamp but every key wrong must be a plain SignatureMismatch. This
+        // pins down that the mismatch branch is exercised with timestamps in
+        // tolerance, distinct from the tolerance path.
+        let slack_secret = "8f742231b10e8888abcd99yyyzzz85a5";
+        let slack_body = b"token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J";
+        let ts = 1_531_420_618u64;
+        let sig = slack_signature(slack_secret, ts, slack_body);
+        let sig_value = format!("v0={sig}");
+        let ts_value = ts.to_string();
+        let headers = [
+            ("X-Slack-Signature", sig_value.as_str()),
+            ("X-Slack-Request-Timestamp", ts_value.as_str()),
+        ];
+        let options = clocked_at(ts, Some(Duration::from_secs(300)));
+
+        let secrets = [Secret::new("wrong-1"), Secret::new("wrong-2")];
+        assert_eq!(
+            verify_any(Provider::Slack, &headers, slack_body, &secrets, options),
+            Err(VerifyError::SignatureMismatch)
         );
     }
 
