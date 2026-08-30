@@ -19,19 +19,24 @@ pub(crate) fn parse_timestamp(header: &'static str, value: &str) -> Result<u64, 
         });
     }
 
-    value.parse::<u64>().map_err(|_| {
-        if value.starts_with('-') || !value.bytes().all(|b| b.is_ascii_digit()) {
-            VerifyError::MalformedHeader {
-                header,
-                reason: "timestamp is not a valid unix timestamp",
-            }
-        } else {
-            VerifyError::MalformedHeader {
-                header,
-                reason: "timestamp overflows unix seconds",
-            }
-        }
-    })
+    // Reject any value that isn't a pure sequence of ASCII digits. This
+    // refuses leading `+`/`-`, whitespace, and non-numeric text, all of which
+    // would otherwise pass through Rust's `u64::from_str` (e.g. `+1531420618`).
+    // Timestamps are "integer unix seconds" per `spec.md` §3 — no sign prefix
+    // is valid.
+    if !value.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(VerifyError::MalformedHeader {
+            header,
+            reason: "timestamp is not a valid unix timestamp",
+        });
+    }
+
+    value
+        .parse::<u64>()
+        .map_err(|_| VerifyError::MalformedHeader {
+            header,
+            reason: "timestamp overflows unix seconds",
+        })
 }
 
 /// Enforces `|now - t| <= max_age` when replay protection is enabled.
@@ -111,6 +116,19 @@ mod tests {
     fn non_numeric_timestamp_is_malformed() {
         assert_eq!(
             parse_timestamp("X-Timestamp", "not-a-number"),
+            Err(VerifyError::MalformedHeader {
+                header: "X-Timestamp",
+                reason: "timestamp is not a valid unix timestamp",
+            })
+        );
+    }
+
+    #[test]
+    fn leading_plus_timestamp_is_malformed() {
+        // `"+1700000000".parse::<u64>()` would otherwise succeed; a leading
+        // sign is not "integer unix seconds" and must fail closed.
+        assert_eq!(
+            parse_timestamp("X-Timestamp", "+1700000000"),
             Err(VerifyError::MalformedHeader {
                 header: "X-Timestamp",
                 reason: "timestamp is not a valid unix timestamp",
