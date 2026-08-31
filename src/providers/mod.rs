@@ -20,7 +20,13 @@ mod zoom;
 
 pub use custom::{CustomScheme, Encoding, HashAlg};
 
-use std::fmt;
+use core::fmt;
+
+#[cfg(any(feature = "tower", feature = "actix"))]
+use alloc::vec;
+
+#[cfg(any(feature = "tower", feature = "actix"))]
+use alloc::vec::Vec;
 
 use crate::core::VerifyOptions;
 use crate::core::error::VerifyError;

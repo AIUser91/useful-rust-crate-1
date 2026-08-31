@@ -4,8 +4,8 @@
 //! body, or a computed signature. They may carry header *names*, static reason
 //! strings, and numeric skew values.
 
-use std::fmt;
-use std::time::Duration;
+use core::fmt;
+use core::time::Duration;
 
 /// Everything that can go wrong while verifying a webhook signature.
 ///
@@ -92,6 +92,7 @@ impl fmt::Display for VerifyError {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for VerifyError {}
 
 #[cfg(test)]

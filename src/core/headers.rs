@@ -1,7 +1,11 @@
 //! The [`HeaderMap`] abstraction: lets `verify()` work against any framework's
 //! header representation.
 
-use std::collections::{BTreeMap, HashMap};
+use alloc::collections::BTreeMap;
+use alloc::string::String;
+use alloc::vec::Vec;
+#[cfg(feature = "std")]
+use std::collections::HashMap;
 
 /// Case-insensitive, read-only header lookup.
 ///
@@ -76,6 +80,7 @@ impl HeaderMap for BTreeMap<String, String> {
     }
 }
 
+#[cfg(feature = "std")]
 impl HeaderMap for HashMap<String, String> {
     fn get(&self, name: &str) -> Option<&str> {
         self.iter()
@@ -122,6 +127,7 @@ mod tests {
         assert_eq!(headers.get("A"), Some("first"));
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn hash_map_is_case_insensitive() {
         let mut headers = HashMap::new();

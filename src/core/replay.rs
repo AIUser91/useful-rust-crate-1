@@ -43,27 +43,21 @@ pub(crate) fn parse_timestamp(header: &'static str, value: &str) -> Result<u64, 
 ///
 /// Symmetric window: the timestamp is HMAC-covered, and sub-second precision
 /// of "now" is truncated. Returns `Ok(())` when `max_age` is `None` (check
-/// disabled). A clock before the UNIX epoch yields 0, which fail-closed
-/// rejects any realistic delivery timestamp.
+/// disabled). A clock reading 0 (e.g. no `Clock` injected on a `no_std`
+/// target) fail-closed rejects any realistic delivery timestamp.
 pub(crate) fn check_replay(timestamp: u64, options: &VerifyOptions) -> Result<(), VerifyError> {
     let Some(max_age) = options.max_age else {
         return Ok(());
     };
 
-    // A clock before the UNIX epoch yields 0 here, which fail-closed rejects
-    // any realistic delivery timestamp rather than accepting it silently.
-    let now_unix = options
-        .now()
-        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+    let now_unix = options.now();
 
     // `abs_diff` avoids overflow/panic for absurd attacker-chosen values in
     // either direction.
     let skew_secs = now_unix.abs_diff(timestamp);
     if skew_secs > max_age.as_secs() {
         return Err(VerifyError::TimestampOutOfTolerance {
-            skew: std::time::Duration::from_secs(skew_secs),
+            skew: core::time::Duration::from_secs(skew_secs),
             max_age,
         });
     }

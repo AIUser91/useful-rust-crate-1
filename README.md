@@ -118,6 +118,23 @@ webhook-verify = { version = "0.1", features = ["actix"] }
 With the `http` feature enabled, any `http::HeaderMap` (from axum, tower, or
 hyper requests) implements `HeaderMap` and can be passed to `verify()` directly.
 
+### `no_std` support
+
+The core verification path is `no_std + alloc` compatible (validated against
+`wasm32-unknown-unknown`). The `std` feature (on by default) provides the wall
+clock used for replay protection and the `std::error::Error` impl. Disable it
+for constrained targets:
+
+```toml
+# no wall clock; supply your own Clock for timestamped providers
+webhook-verify = { version = "0.1", default-features = false, features = ["std"] }
+webhook-verify = { version = "0.1", default-features = false }
+```
+
+Without `std`, [`Clock::now`] returns unix seconds directly, `SystemClock` is
+unavailable, and `VerifyError` does not implement `std::error::Error` — see
+`spec.md` §7.
+
 ## Framework adapters
 
 ### Tower (also Axum)

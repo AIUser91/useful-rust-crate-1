@@ -45,6 +45,9 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 #![warn(missing_docs)]
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
 
 mod core;
 mod providers;
@@ -58,5 +61,7 @@ pub mod actix;
 #[cfg(feature = "tower")]
 pub mod tower;
 
-pub use crate::core::{Clock, HeaderMap, Secret, SystemClock, VerifyError, VerifyOptions};
+#[cfg(feature = "std")]
+pub use crate::core::SystemClock;
+pub use crate::core::{Clock, HeaderMap, Secret, VerifyError, VerifyOptions};
 pub use crate::providers::{CustomScheme, Encoding, HashAlg, Provider, verify, verify_any};

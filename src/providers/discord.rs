@@ -42,6 +42,8 @@
 
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
+use alloc::vec::Vec;
+
 use crate::core::VerifyOptions;
 use crate::core::crypto::verify_ed25519;
 use crate::core::error::VerifyError;
@@ -104,7 +106,7 @@ pub(crate) fn verify(
 /// pasted something other than the Developer Portal value, so fail closed
 /// with [`VerifyError::InvalidSecret`] instead of attempting verification.
 fn decode_public_key(secret: &[u8]) -> Result<Vec<u8>, VerifyError> {
-    let secret_str = std::str::from_utf8(secret).map_err(|_| VerifyError::InvalidSecret {
+    let secret_str = core::str::from_utf8(secret).map_err(|_| VerifyError::InvalidSecret {
         reason: "public key must be a hex-encoded string",
     })?;
     let decoded = hex::decode(secret_str).map_err(|_| VerifyError::InvalidSecret {

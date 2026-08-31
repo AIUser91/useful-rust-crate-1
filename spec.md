@@ -532,7 +532,16 @@ A provider implementation is not mergeable until it has:
   base64/hex decoding and header string handling; target `no_std + alloc`
   and validate against `wasm32-unknown-unknown` as the primary constrained
   target (webhook verification at the edge, e.g. Cloudflare Workers via
-  `wasm-bindgen`, is a plausible real use case).
+  `wasm-bindgen`, is a plausible real use case). *Implemented (issue #76):
+  the core is `no_std + alloc` behind the `std` feature (default on). Building
+  with `--no-default-features` drops the wall clock: [`Clock::now`] returns
+  unix seconds directly (no `SystemTime`), [`SystemClock`] is `std`-only, and
+  [`VerifyError`] does not implement `std::error::Error`. Callers on
+  bare-metal/wasm targets supply their own [`Clock`] for timestamped
+  (replay-protected) providers; a missing clock reads 0 and fail-closes replay
+  checks. Remaining work: a CI job (needs `.github/workflows/` write access) to
+  keep `--target wasm32-unknown-unknown --no-default-features` from
+  regressing.*
 - **Provider promotion criteria.** A `CustomScheme` recipe gets promoted to
   a first-class `Provider` variant once it has (a) official test vectors,
   (b) at least one external user request or contribution, and (c) no open

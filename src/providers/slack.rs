@@ -23,6 +23,8 @@
 
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
+use alloc::vec::Vec;
+
 use crate::core::VerifyOptions;
 use crate::core::crypto::verify_hmac_sha256;
 use crate::core::error::VerifyError;
