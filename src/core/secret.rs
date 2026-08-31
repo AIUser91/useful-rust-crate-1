@@ -1,7 +1,8 @@
 //! The [`Secret`] wrapper: keeps signing material out of logs, errors, and
 //! debug output.
 
-use std::fmt;
+use alloc::string::String;
+use core::fmt;
 
 /// Wraps webhook signing material (an HMAC key, or — for asymmetric schemes
 /// such as Discord — a hex-encoded public key; see the provider's docs for

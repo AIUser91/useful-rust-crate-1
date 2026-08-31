@@ -49,6 +49,9 @@
 
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use crate::core::VerifyOptions;
 use crate::core::crypto::verify_hmac_sha1;
 use crate::core::error::VerifyError;

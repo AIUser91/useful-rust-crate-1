@@ -50,7 +50,8 @@
 
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
-use std::fmt;
+use alloc::vec::Vec;
+use core::fmt;
 
 use crate::core::VerifyOptions;
 use crate::core::crypto::{verify_hmac_sha1, verify_hmac_sha256, verify_hmac_sha512};
@@ -165,8 +166,8 @@ impl PartialEq for CustomScheme {
 
 impl Eq for CustomScheme {}
 
-impl std::hash::Hash for CustomScheme {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl core::hash::Hash for CustomScheme {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.hash.hash(state);
         self.signature_header.hash(state);
         self.timestamp_header.hash(state);

@@ -32,6 +32,8 @@
 
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
+use alloc::vec::Vec;
+
 use base64::Engine as _;
 use base64::{
     alphabet,
@@ -130,7 +132,7 @@ pub(crate) fn verify(
 /// published unpadded-secret vectors require. An empty or undecodable secret
 /// fails closed.
 fn decode_secret(secret: &[u8]) -> Result<Vec<u8>, VerifyError> {
-    let as_str = std::str::from_utf8(secret).map_err(|_| VerifyError::InvalidSecret {
+    let as_str = core::str::from_utf8(secret).map_err(|_| VerifyError::InvalidSecret {
         reason: "secret must be valid UTF-8",
     })?;
     let encoded = as_str.strip_prefix(SECRET_PREFIX).unwrap_or(as_str);

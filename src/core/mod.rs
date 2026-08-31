@@ -14,5 +14,7 @@ pub(crate) mod secret;
 
 pub use error::VerifyError;
 pub use headers::HeaderMap;
-pub use options::{Clock, SystemClock, VerifyOptions};
+#[cfg(feature = "std")]
+pub use options::SystemClock;
+pub use options::{Clock, VerifyOptions};
 pub use secret::Secret;

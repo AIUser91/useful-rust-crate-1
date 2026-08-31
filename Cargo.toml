@@ -37,6 +37,15 @@ tower-layer = { version = "0.3.3", optional = true }
 tower-service = { version = "0.3.3", optional = true }
 
 [features]
+default = ["std"]
+# The core verification path is `no_std + alloc` compatible (spec.md §1).
+# Building without this feature drops the wall-clock dependency: the
+# injectable `Clock::now()` returns unix seconds directly and `VerifyError`
+# does not implement `std::error::Error`. `SystemClock` is only available
+# under `std` (there is no wall clock in the no_std ecosystem); callers on
+# bare-metal/wasm targets supply their own `Clock` for timestamped
+# (replay-protected) providers.
+std = []
 http = ["dep:http"]
 # actix-web 4 adapter: extractor + header bridge (actix's internal `http`
 # 0.2 types need their own impl of the crate's `HeaderMap` trait). Contains

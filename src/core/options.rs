@@ -1,25 +1,40 @@
 //! Verification options: timestamp tolerance and clock injection.
 
-use std::fmt;
-use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use core::fmt;
+use core::time::Duration;
+#[cfg(feature = "std")]
+use std::time::SystemTime;
 
 /// Source of "now", injectable so replay-protection tests are deterministic.
+///
+/// Returns unix seconds (the number of whole seconds since the Unix epoch);
+/// this keeps the crate `no_std + alloc` compatible (`spec.md` §1) — there is
+/// no wall clock in the no_std ecosystem, so callers on such targets supply
+/// their own implementation (e.g. from a platform RTC or NTP-synced counter).
 ///
 /// Only providers whose scheme signs a timestamp use a clock; for others
 /// (GitHub, Shopify) no `Clock` is consulted.
 pub trait Clock: Send + Sync {
-    /// The current time.
-    fn now(&self) -> SystemTime;
+    /// The current time as unix seconds.
+    fn now(&self) -> u64;
 }
 
-/// The default [`Clock`]: real wall-clock time.
+/// The default [`Clock`]: real wall-clock time. Only available under the
+/// `std` feature, which is on by default.
+#[cfg(feature = "std")]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SystemClock;
 
+#[cfg(feature = "std")]
 impl Clock for SystemClock {
-    fn now(&self) -> SystemTime {
+    fn now(&self) -> u64 {
         SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
     }
 }
 
@@ -135,12 +150,16 @@ impl VerifyOptions {
         self
     }
 
-    /// Resolves "now" from the injected clock, falling back to system time.
+    /// Resolves "now" in unix seconds from the injected clock, falling back to
+    /// the real wall clock under `std`.
     #[must_use]
-    pub fn now(&self) -> SystemTime {
+    pub fn now(&self) -> u64 {
         match &self.clock {
             Some(clock) => clock.now(),
-            None => SystemTime::now(),
+            #[cfg(feature = "std")]
+            None => SystemClock.now(),
+            #[cfg(not(feature = "std"))]
+            None => 0,
         }
     }
 }
@@ -176,14 +195,14 @@ mod tests {
 
     #[test]
     fn injected_clock_is_used_for_now() {
-        let fixed = epoch(1_700_000_000);
+        let fixed = FixedClock(epoch(1_700_000_000));
         let opts = VerifyOptions {
             max_age: Some(Duration::from_secs(300)),
-            clock: Some(Arc::new(FixedClock(fixed))),
+            clock: Some(Arc::new(FixedClock(epoch(1_700_000_000)))),
             request_url: None,
             form_params: None,
         };
-        assert_eq!(opts.now(), fixed);
+        assert_eq!(opts.now(), fixed.0);
     }
 
     #[test]
@@ -239,9 +258,10 @@ mod tests {
 
     #[test]
     fn builder_sets_clock() {
-        let fixed = epoch(1_700_000_000);
-        let opts = VerifyOptions::default().with_clock(Some(Arc::new(FixedClock(fixed))));
-        assert_eq!(opts.now(), fixed);
+        let fixed = FixedClock(epoch(1_700_000_000));
+        let opts =
+            VerifyOptions::default().with_clock(Some(Arc::new(FixedClock(epoch(1_700_000_000)))));
+        assert_eq!(opts.now(), fixed.0);
     }
 
     #[test]
