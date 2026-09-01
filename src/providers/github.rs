@@ -221,9 +221,7 @@ mod tests {
         // "max_age ignored" behavior against regressions.
         let options = crate::core::VerifyOptions {
             max_age: Some(Duration::ZERO),
-            clock: None,
-            request_url: None,
-            form_params: None,
+            ..crate::core::VerifyOptions::default()
         };
         let result = verify(
             crate::Provider::GitHub,

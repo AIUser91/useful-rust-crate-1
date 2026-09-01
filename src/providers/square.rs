@@ -280,9 +280,8 @@ mod tests {
         // reject a validly signed delivery. Pins the documented behavior.
         let options = VerifyOptions {
             max_age: Some(Duration::ZERO),
-            clock: None,
             request_url: Some(OFFICIAL_URL.to_string()),
-            form_params: None,
+            ..VerifyOptions::default()
         };
         let result = verify(
             crate::Provider::Square,
