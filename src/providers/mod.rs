@@ -10,6 +10,8 @@ mod discord;
 mod dropbox;
 mod github;
 mod linear;
+#[cfg(feature = "sendgrid")]
+mod sendgrid;
 mod shopify;
 mod slack;
 mod square;
@@ -64,7 +66,10 @@ pub enum Provider {
     Discord,
     /// PayPal (certificate-based; see `spec.md` §7 open questions).
     PayPal,
-    /// SendGrid (ECDSA; see `spec.md` §7 open questions).
+    /// SendGrid (ECDSA P-256; key via `VerifyOptions::verifying_material`).
+    ///
+    /// Requires the `sendgrid` crate feature; without it this variant fails
+    /// closed with [`VerifyError::UnsupportedProvider`].
     SendGrid,
     /// Linear (`linear-signature`, HMAC-SHA256).
     Linear,
@@ -142,7 +147,13 @@ pub(crate) fn signature_header_names(provider: &Provider) -> Vec<&'static str> {
             }
             names
         }
-        Provider::PayPal | Provider::SendGrid => Vec::new(),
+        #[cfg(feature = "sendgrid")]
+        Provider::SendGrid => {
+            vec![sendgrid::SIGNATURE_HEADER, sendgrid::TIMESTAMP_HEADER]
+        }
+        Provider::PayPal => Vec::new(),
+        #[cfg(not(feature = "sendgrid"))]
+        Provider::SendGrid => Vec::new(),
     }
 }
 
@@ -169,7 +180,8 @@ pub(crate) fn signature_header_names(provider: &Provider) -> Vec<&'static str> {
 /// timestamp-based replay protection return
 /// [`VerifyError::TimestampOutOfTolerance`] when the signed timestamp is too
 /// old. [`VerifyError::UnsupportedProvider`] is returned for providers that
-/// have no implementation yet (PayPal, SendGrid). [`VerifyError::InvalidSecret`]
+/// have no implementation yet (PayPal) or whose implementation is disabled by
+/// a crate feature (SendGrid without `sendgrid`). [`VerifyError::InvalidSecret`]
 /// is returned when the secret is not in the format the provider requires.
 /// [`VerifyError::MissingContext`] is returned when provider-specific request
 /// context (e.g. Square's notification URL) was not supplied via
@@ -195,8 +207,12 @@ pub fn verify(
         }
         Provider::Twilio => twilio::verify(headers, raw_body, secret, &options),
         Provider::Dropbox => dropbox::verify(headers, raw_body, secret, &options),
+        #[cfg(feature = "sendgrid")]
+        Provider::SendGrid => sendgrid::verify(headers, raw_body, secret, &options),
+        #[cfg(not(feature = "sendgrid"))]
+        Provider::SendGrid => Err(VerifyError::UnsupportedProvider),
         Provider::Custom(scheme) => custom::verify(&scheme, headers, raw_body, secret, &options),
-        Provider::PayPal | Provider::SendGrid => Err(VerifyError::UnsupportedProvider),
+        Provider::PayPal => Err(VerifyError::UnsupportedProvider),
     }
 }
 

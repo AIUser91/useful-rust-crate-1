@@ -59,9 +59,16 @@ impl Secret {
 }
 // Debug/Display for Secret print "Secret(**redacted**)" only.
 
+/// Caller-supplied asymmetric verification material (spec §7).
+#[non_exhaustive]
+pub enum VerifyingKeyMaterial {
+    X509Certificate(Vec<u8>),        // PayPal (planned)
+    EcdsaP256PublicKey(Vec<u8>),      // SendGrid (shipped, feature `sendgrid`)
+}
+// Debug redacts the key/certificate bytes (variant name + byte length only).
+
 pub struct VerifyOptions {  // #[non_exhaustive]: configure via Default + the
-                            //   `with_*` builders so new fields (e.g. §7
-                            //   `verifying_material`) stay non-breaking
+                            //   `with_*` builders so new fields stay non-breaking
     /// Maximum allowed age between the signed timestamp and "now",
     /// for providers whose scheme includes a timestamp. `None` disables
     /// the check (not recommended). Default: Some(Duration::from_secs(300)).
@@ -76,11 +83,23 @@ pub struct VerifyOptions {  // #[non_exhaustive]: configure via Default + the
     /// (currently Twilio). Pass every field as received; sorting into
     /// signing order happens here. See §3.
     pub form_params: Option<Vec<(String, String)>>,
+    /// Asymmetric public-key/certificate material for schemes that verify
+    /// against a configured key rather than a shared secret (currently
+    /// SendGrid's ECDSA P-256 key; PayPal when it lands). Required-but-absent
+    /// fails closed with `MissingContext`; malformed material with
+    /// `InvalidSecret`. This crate never fetches key material (§7).
+    pub verifying_material: Option<VerifyingKeyMaterial>,
 }
 
 impl Default for VerifyOptions {
     fn default() -> Self {
-        Self { max_age: Some(Duration::from_secs(300)), clock: None }
+        Self {
+            max_age: Some(Duration::from_secs(300)),
+            clock: None,
+            request_url: None,
+            form_params: None,
+            verifying_material: None,
+        }
     }
 }
 
@@ -334,15 +353,60 @@ Discord's official SDKs (`discord-interactions-js`,
   vectors over exactly the officially documented construction. Replace them
   if Discord ever publishes fixed vectors.
 
-### PayPal / SendGrid
+### PayPal
 
-- Both use asymmetric (certificate/ECDSA-based) verification requiring a
-  configured public key/certificate rather than a bare shared secret. The
-  certificate-fetch design question is now resolved (§7): these crates
-  never fetch key material themselves — the caller supplies it via
-  `VerifyOptions::verifying_material`. Until first-class implementations
-  land, both remain available as documented `CustomScheme` recipes plus
-  tested helper functions.
+- Uses asymmetric certificate-based verification requiring a configured
+  X.509 certificate; the certificate-fetch design question is resolved (§7):
+  the crate never fetches key material — the caller supplies an already
+  vetted certificate via `VerifyOptions::verifying_material`
+  (`VerifyingKeyMaterial::X509Certificate`). The exact signed-string
+  construction must be pinned against official sources before the provider
+  lands; until then, `Provider::PayPal` fails closed with
+  `UnsupportedProvider` (available meanwhile as a documented `CustomScheme`
+  recipe).
+
+### SendGrid
+
+Source: Twilio's official "Signature Verification" documentation for the
+Email Event Webhook
+(<https://www.twilio.com/docs/sendgrid/for-developers/tracking-events/getting-started-event-webhook-signature-verification>)
+and the canonical server-side implementation in `sendgrid-go`
+`helpers/eventwebhook/eventwebhook.go`
+(<https://github.com/sendgrid/sendgrid-go/blob/main/helpers/eventwebhook/eventwebhook.go>).
+
+- Headers: `X-Twilio-Email-Event-Webhook-Signature` and
+  `X-Twilio-Email-Event-Webhook-Timestamp` (integer unix seconds)
+- Signed message: `"{timestamp}{raw_body}"` — the timestamp verbatim from
+  its header, immediately followed by the raw request body bytes, no
+  separator. SHA-256 of the whole message is what ECDSA operatively
+  verifies (matching Go's `hash.Write(ts); hash.Write(payload)`).
+- Algorithm: ECDSA over NIST P-256 (secp256r1), digest SHA-256.
+- Signature encoding: base64 (standard alphabet, padded) of the ASN.1 DER
+  form `SEQUENCE { INTEGER r, INTEGER s }`. Non-canonical/undersized DER and
+  scalars ≥ the curve order fail closed with `BadEncoding` (parsed by
+  RustCrypto's `ecdsa` DER reader).
+- Key material: the "Verification Key" from the dashboard is a base64
+  encoding of the ECDSA P-256 public key in `SubjectPublicKeyInfo` DER
+  (Go's `x509.ParsePKIXPublicKey`). Callers pass the **decoded DER bytes**
+  as `VerifyingKeyMaterial::EcdsaP256PublicKey`; the base64 string is **not**
+  accepted (documented in the provider module docs). Algorithm/certificate
+  OIDs in the SPKI must match `id-ecPublicKey` + `prime256v1`: a key for a
+  different curve/algorithm fails closed with `InvalidSecret`, not
+  `SignatureMismatch`.
+- The shared `Secret` argument is accepted for API uniformity and ignored
+  (this is a public-key scheme, like Discord).
+- Replay protection: enforced with the shared default tolerance (symmetric
+  `|now - t| <= max_age`). Twilio's docs define no numeric window; the
+  timestamp exists so receivers can reject stale events. Callers can widen
+  or disable via `max_age`.
+- Feature gate: shipped behind `features = ["sendgrid"]` (optional `p256`
+  dependency, `no_std`-compatible). Without the feature, `Provider::SendGrid`
+  fails closed with `UnsupportedProvider`.
+- Test vectors: the primary vector is SendGrid's own (`sendgrid-go`
+  `helpers/eventwebhook/eventwebhook_test.go`): key, signature, and
+  timestamp reproduced verbatim, body byte-identical to Go's `json.Marshal`
+  output plus trailing `\r\n`. Additional vectors are locally constructed
+  with deterministic seeds over exactly the documented construction.
 
 ### Zoom
 
@@ -482,18 +546,27 @@ A provider implementation is not mergeable until it has:
   3. A synchronous fetcher would drag in blocking HTTP + TLS dependencies;
      an async one would force a runtime choice on all users.
 
-  API sketch for the implementation PRs:
+  Status: **SendGrid shipped (2026-09) behind `features = ["sendgrid"]`**
+  — `VerifyingKeyMaterial::EcdsaP256PublicKey`, the `verifying_material`
+  option, and the ECDSA P-256 verification path are implemented with the
+  provider's own test vector (see §3 SendGrid row). **PayPal still pending:**
+  the `X509Certificate` variant and the `verifying_material` plumbing are
+  in place, ready for its scheme to be pinned to official sources. The API
+  shipped matches the 2026-08 sketch below (with key/certificate bytes
+  redacted from `Debug` output on the enum):
 
   ```rust
   /// Caller-supplied asymmetric verification material (spec §7).
+  #[non_exhaustive]
   pub enum VerifyingKeyMaterial {
       /// DER- or PEM-encoded X.509 certificate (PayPal). Only the embedded
       /// public key is used; this crate performs no chain validation, so
       /// callers needing chain/pin enforcement supply an already-validated
       /// certificate.
       X509Certificate(Vec<u8>),
-      /// Raw bytes of an ECDSA P-256 public key (SendGrid), decoded by the
-      /// caller from its published base64 form.
+      /// DER bytes of an ECDSA P-256 `SubjectPublicKeyInfo` public key
+      /// (SendGrid scheme), decoded by the caller from the dashboard's
+      /// base64 "Verification Key".
       EcdsaP256PublicKey(Vec<u8>),
   }
 
@@ -501,26 +574,26 @@ A provider implementation is not mergeable until it has:
       // ... existing fields ...
       /// Verification material for providers whose scheme checks a
       /// signature against a configured public key/certificate rather
-      /// than a shared secret (currently PayPal, SendGrid). This crate
-      /// never fetches anything from the network.
+      /// than a shared secret (currently SendGrid; PayPal when it lands).
+      /// This crate never fetches anything from the network.
       pub verifying_material: Option<VerifyingKeyMaterial>,
   }
   ```
 
-  Error semantics follow existing conventions: required-but-absent
+  Error semantics (shipped and tested): required-but-absent
   `verifying_material` fails closed with `MissingContext` (caller
   misconfiguration, mirroring Square/Twilio); malformed material (bad
-  PEM/DER, wrong length) with `InvalidSecret`; header problems with the
-  usual `MissingHeader`/`MalformedHeader`; everything else is
+  SPKI, wrong curve/algorithm) and a `X509Certificate` passed where
+  SendGrid requires a bare key fail with `InvalidSecret`; undecodable
+  base64 or non-DER signatures are `BadEncoding`; everything else is
   `SignatureMismatch`.
 
-  Implementation notes for the follow-up PRs: exact per-provider signed-
-  string constructions must be pinned against official sources and added
-  as §3 rows in the same PR as the code (repo policy); asymmetric
-  verification will need feature-gated RustCrypto dependencies (`rsa`,
-  `p256`) justified per AGENTS.md. The optional `webhook-verify-fetch`
-  companion crate remains future work if automated key rotation handling
-  is ever requested — it stays out of this crate either way.
+  Implementation notes: asymmetric verification uses a feature-gated
+  RustCrypto dependency (`p256`, optional `no_std`-compatible — see the
+  crate's `Cargo.toml`; `rsa` will be needed when PayPal lands). The
+  optional `webhook-verify-fetch` companion crate remains future work if
+  automated key rotation handling is ever requested — it stays out of this
+  crate either way.
 
 - **Secret rotation UX.** Stripe/Standard Webhooks allow multiple valid
   signatures during a rotation window (`v1=...,v1=...`). Should `verify()`

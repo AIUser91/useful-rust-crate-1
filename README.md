@@ -88,7 +88,7 @@ hand-copied signing-string logic to get wrong.
 | Twilio | HMAC-SHA1 over URL + sorted form params, `X-Twilio-Signature` (needs `VerifyOptions::request_url` + `form_params`) | ✅ |
 | Discord | Ed25519 (public-key), no shared secret | ✅ |
 | PayPal | Certificate-based / API verification | 🚧 planned (design settled, spec §7) |
-| SendGrid | ECDSA (asymmetric) | 🚧 planned (design settled, spec §7) |
+| SendGrid | ECDSA P-256 over `timestamp.body`, public key via `VerifyOptions::verifying_material` (needs `sendgrid` feature) | ✅ |
 | Zoom | HMAC-SHA256, `v0=` scheme, `x-zm-signature` + timestamp | ✅ |
 | Dropbox | HMAC-SHA256, `X-Dropbox-Signature` | ✅ |
 | Standard Webhooks spec (Svix, Clerk, Resend, ...) | HMAC-SHA256, `webhook-signature` (`v1,` base64, rotation list) + replay window | ✅ |
@@ -98,6 +98,16 @@ Providers marked 🚧 exist as fail-closed variants of the `Provider` enum:
 passing one to `verify()` returns `VerifyError::UnsupportedProvider`. See
 [`spec.md`](./spec.md) for the exact signed-string construction, header
 names, and encoding for each provider, and the process for adding new ones.
+
+SendGrid verification is compiled only with the crate feature:
+
+```toml
+[dependencies]
+webhook-verify = { version = "0.1", features = ["sendgrid"] }
+```
+
+For `no_std + alloc` targets, keep `default-features = false` together with
+`features = ["sendgrid"]`.
 
 ## Installation
 

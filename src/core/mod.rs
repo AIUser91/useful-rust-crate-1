@@ -18,5 +18,5 @@ pub use error::VerifyError;
 pub use headers::HeaderMap;
 #[cfg(feature = "std")]
 pub use options::SystemClock;
-pub use options::{Clock, VerifyOptions};
+pub use options::{Clock, VerifyOptions, VerifyingKeyMaterial};
 pub use secret::Secret;
