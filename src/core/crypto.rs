@@ -10,6 +10,15 @@ use sha1::Sha1;
 use sha2::{Sha256, Sha512};
 use subtle::ConstantTimeEq;
 
+#[cfg(feature = "sendgrid")]
+use p256::ecdsa::signature::hazmat::PrehashVerifier;
+#[cfg(feature = "sendgrid")]
+use p256::ecdsa::{Signature as EcdsaSignature, VerifyingKey as EcdsaVerifyingKey};
+#[cfg(feature = "sendgrid")]
+use p256::pkcs8::DecodePublicKey;
+#[cfg(feature = "sendgrid")]
+use sha2::Digest;
+
 type HmacSha256 = Hmac<Sha256>;
 type HmacSha1 = Hmac<Sha1>;
 type HmacSha512 = Hmac<Sha512>;
@@ -114,6 +123,60 @@ pub(crate) fn verify_ed25519(public_key: &[u8], message: &[u8], signature: &[u8]
         Ok(sig) => verifying_key.verify(message, &sig).is_ok(),
         Err(_) => false,
     }
+}
+
+#[cfg(feature = "sendgrid")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EcdsaP256Check {
+    /// The signature is valid for `message` under the given public key.
+    Verified,
+    /// The public key bytes are not a parseable ECDSA P-256
+    /// `SubjectPublicKeyInfo` (operator configuration issue).
+    BadKey,
+    /// The signature bytes are not parseable ECDSA DER (wire-encoding issue).
+    BadSignature,
+    /// The key and signature parse, but the signature does not match.
+    Mismatch,
+}
+
+/// Verifies an ECDSA P-256 signature over the **pre-hashed** digest of
+/// `message` against an SPKI `SubjectPublicKeyInfo` public key (SendGrid).
+///
+/// The signed-string construction is provider-specific (SendGrid signs the
+/// SHA-256 digest of `{timestamp}{raw_body}`); this helper takes the already
+/// assembled `message` and hashes it with SHA-256 internally — the digest
+/// then being what ECDSA operatively verifies, exactly matching the wire
+/// scheme (`spec.md` §3).
+///
+/// Returns a tri-state so providers can classify configuration errors
+/// (`BadKey` → `InvalidSecret`) and wire-encoding errors (`BadSignature` →
+/// `BadEncoding`) distinctly from a forgery (`Mismatch` →
+/// `SignatureMismatch`). Like [`verify_ed25519`], parsing fails closed to a
+/// check result rather than panicking on attacker-controlled or
+/// operator-controlled input.
+#[cfg(feature = "sendgrid")]
+pub(crate) fn check_ecdsa_p256(
+    verifying_key_spki: &[u8],
+    message: &[u8],
+    signature_der: &[u8],
+) -> EcdsaP256Check {
+    let verifying_key = match EcdsaVerifyingKey::from_public_key_der(verifying_key_spki) {
+        Ok(key) => key,
+        Err(_) => return EcdsaP256Check::BadKey,
+    };
+    let signature = match EcdsaSignature::from_der(signature_der) {
+        Ok(sig) => sig,
+        Err(_) => return EcdsaP256Check::BadSignature,
+    };
+
+    let mut hasher = Sha256::new();
+    hasher.update(message);
+    let digest = hasher.finalize();
+
+    if verifying_key.verify_prehash(&digest, &signature).is_err() {
+        return EcdsaP256Check::Mismatch;
+    }
+    EcdsaP256Check::Verified
 }
 
 #[cfg(test)]

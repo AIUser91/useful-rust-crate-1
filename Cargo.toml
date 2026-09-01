@@ -30,6 +30,7 @@ hmac = "0.13.0"
 http = { version = "1.5.0", optional = true }
 http-body = { version = "1.1.0", optional = true }
 http-body-util = { version = "0.1.5", optional = true }
+p256 = { version = "0.14.0", default-features = false, features = ["ecdsa", "pkcs8"], optional = true }
 sha1 = "0.11.0"
 sha2 = "0.11.0"
 subtle = "2.6.1"
@@ -46,6 +47,10 @@ default = ["std"]
 # bare-metal/wasm targets supply their own `Clock` for timestamped
 # (replay-protected) providers.
 std = []
+# Enables the SendGrid provider: ECDSA P-256 verification (`spec.md` §3).
+# Pulls in `p256` (optional dependency, `no_std`-compatible build). Only the
+# verification path is used; no key generation and no network access.
+sendgrid = ["dep:p256"]
 http = ["dep:http"]
 # actix-web 4 adapter: extractor + header bridge (actix's internal `http`
 # 0.2 types need their own impl of the crate's `HeaderMap` trait). Contains

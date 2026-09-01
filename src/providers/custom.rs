@@ -671,6 +671,7 @@ mod tests {
                 clock: None,
                 request_url: None,
                 form_params: None,
+                verifying_material: None,
             },
         );
         assert_eq!(result, Ok(()));

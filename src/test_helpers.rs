@@ -28,5 +28,6 @@ pub fn clocked_at(secs: u64, max_age: Option<Duration>) -> VerifyOptions {
         clock: Some(Arc::new(FixedClock(secs))),
         request_url: None,
         form_params: None,
+        verifying_material: None,
     }
 }

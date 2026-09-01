@@ -63,5 +63,5 @@ pub mod tower;
 
 #[cfg(feature = "std")]
 pub use crate::core::SystemClock;
-pub use crate::core::{Clock, HeaderMap, Secret, VerifyError, VerifyOptions};
+pub use crate::core::{Clock, HeaderMap, Secret, VerifyError, VerifyOptions, VerifyingKeyMaterial};
 pub use crate::providers::{CustomScheme, Encoding, HashAlg, Provider, verify, verify_any};

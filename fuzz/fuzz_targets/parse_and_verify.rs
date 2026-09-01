@@ -8,6 +8,8 @@
 
 use libfuzzer_sys::fuzz_target;
 use webhook_verify::{CustomScheme, Encoding, HashAlg, Provider, Secret, VerifyOptions};
+#[cfg(feature = "sendgrid")]
+use webhook_verify::VerifyingKeyMaterial;
 
 /// Upper bound on parsed header lines so a pathological input cannot spin the
 /// loop long enough to trip the fuzzer's timeout.
@@ -35,6 +37,10 @@ const IMPLEMENTED: &[Provider] = &[
     // Zoom needs two headers (signature + timestamp) to reach its signature
     // path; timestamp-based replay is exercised via arbitrary body bytes.
     Provider::Zoom,
+    // SendGrid needs `verifying_material` to get past its context check and
+    // into the ECDSA/SPKI parsing path; it is additionally exercised with a
+    // constant valid SPKI below.
+    Provider::SendGrid,
 ];
 
 /// A well-formed secret for each provider's scheme, so the fuzzer reaches the
@@ -104,9 +110,33 @@ fuzz_target!(|data: &[u8]| {
     attempt(Provider::Twilio, &headers, body, WELL_FORMED_SECRET, &twilio_options);
     attempt(Provider::Twilio, &headers, body, WELL_FORMED_SECRET, &VerifyOptions::default());
 
-    // PayPal and SendGrid are not implemented yet; their fail-closed
-    // `UnsupportedProvider` path must also never panic on arbitrary input.
+    // PayPal is not implemented yet; its fail-closed `UnsupportedProvider`
+    // path must also never panic on arbitrary input.
     attempt(Provider::PayPal, &headers, body, WELL_FORMED_SECRET, &VerifyOptions::default());
+
+    // SendGrid reaches its ECDSA path only with caller-supplied key material;
+    // a constant valid P-256 SPKI (the provider's own vector key) lets
+    // arbitrary signature/timestamp/body bytes exercise DER/SPKI parsing, and
+    // the options without material exercise the MissingContext fail-closed
+    // path.
+    #[cfg(feature = "sendgrid")]
+    {
+        const SENDGRID_SPKI_DER: [u8; 91] = [
+            0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06,
+            0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00, 0x04, 0xf3,
+            0x74, 0xf8, 0x3b, 0xf9, 0xfc, 0xe2, 0x2a, 0x2d, 0x22, 0xf2, 0x16, 0xe2, 0x67, 0x41,
+            0x81, 0x0f, 0xfb, 0x74, 0x07, 0xd2, 0x9a, 0x9a, 0x88, 0x33, 0xc9, 0x05, 0xf6, 0x63,
+            0x75, 0x7e, 0x5a, 0x55, 0x29, 0x2d, 0xc6, 0x46, 0xa7, 0xba, 0xda, 0x0c, 0x3e, 0xd9,
+            0xf3, 0x4d, 0x45, 0xa2, 0x0d, 0x5e, 0xf5, 0x69, 0x8a, 0x09, 0x52, 0x23, 0xc7, 0x8d,
+            0x11, 0xce, 0xb0, 0x10, 0x0d, 0xc5, 0xfa,
+        ];
+        let sendgrid_options = VerifyOptions::default().with_verifying_material(
+            VerifyingKeyMaterial::EcdsaP256PublicKey(SENDGRID_SPKI_DER.to_vec()),
+        );
+        attempt(Provider::SendGrid, &headers, body, WELL_FORMED_SECRET, &sendgrid_options);
+        attempt(Provider::SendGrid, &headers, body, WELL_FORMED_SECRET, &VerifyOptions::default());
+    }
+    #[cfg(not(feature = "sendgrid"))]
     attempt(Provider::SendGrid, &headers, body, WELL_FORMED_SECRET, &VerifyOptions::default());
 
     // CustomScheme (spec §2.2): a Slack-shaped configuration exercises the

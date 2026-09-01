@@ -1,4 +1,5 @@
-//! Verification options: timestamp tolerance and clock injection.
+//! Verification options: timestamp tolerance, clock injection, and asymmetric
+//! verification material for public-key providers.
 
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -38,10 +39,50 @@ impl Clock for SystemClock {
     }
 }
 
+/// Caller-supplied asymmetric verification material (`spec.md` §7).
+///
+/// Providers that verify against a configured public key or certificate
+/// (currently SendGrid; PayPal when it lands) take their key material here
+/// rather than in a [`Secret`](crate::Secret), because unlike the shared
+/// symmetric schemes the signing key is never a private value this crate
+/// holds — it is the provider's own *public* key. This crate **never** fetches
+/// key material over the network (`spec.md` §1); the caller supplies bytes
+/// already vetted (allow-listed certificate URL, checked key, etc.).
+#[must_use]
+#[non_exhaustive]
+#[derive(Clone, PartialEq, Eq)]
+pub enum VerifyingKeyMaterial {
+    /// DER- or PEM-encoded X.509 certificate (PayPal scheme). Only the embedded
+    /// public key is used; this crate performs no chain validation, so callers
+    /// needing chain/pin enforcement supply an already-validated certificate.
+    X509Certificate(Vec<u8>),
+    /// DER bytes of an ECDSA P-256 `SubjectPublicKeyInfo` public key (SendGrid
+    /// scheme), decoded by the caller from the provider's published base64
+    /// form (the dashboard "Verification Key").
+    EcdsaP256PublicKey(Vec<u8>),
+}
+
+impl fmt::Debug for VerifyingKeyMaterial {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Redact key/certificate bytes: consistent with the crate-wide rule
+        // that no secret-bearing material appears in `Debug` output. The
+        // variant name and byte length are enough to diagnose configuration.
+        match self {
+            VerifyingKeyMaterial::X509Certificate(bytes) => f
+                .debug_tuple("X509Certificate")
+                .field(&format_args!("<{} bytes>", bytes.len()))
+                .finish(),
+            VerifyingKeyMaterial::EcdsaP256PublicKey(bytes) => f
+                .debug_tuple("EcdsaP256PublicKey")
+                .field(&format_args!("<{} bytes>", bytes.len()))
+                .finish(),
+        }
+    }
+}
+
 /// Tuning knobs for [`crate::verify()`].
 ///
-/// `#[non_exhaustive]`: new knobs are expected to arrive (e.g. the
-/// asymmetric `verifying_material` from `spec.md` §7), and adding a field
+/// `#[non_exhaustive]`: new knobs are expected to arrive, and adding a field
 /// must never break downstream callers. Outside this crate the fields are
 /// therefore configured only through [`Default`] and the `with_*` builder
 /// methods — struct-literal construction is intentionally unavailable.
@@ -93,6 +134,17 @@ pub struct VerifyOptions {
     /// [`crate::VerifyError::MissingContext`] so a caller that forgot to parse
     /// the body cannot be confused with an attacker-supplied input.
     pub form_params: Option<Vec<(String, String)>>,
+    /// Verification material for providers whose scheme checks a signature
+    /// against a configured public key/certificate rather than a shared secret
+    /// (currently SendGrid; PayPal when it lands). See [`VerifyingKeyMaterial`].
+    ///
+    /// Required-but-absent fails closed with [`crate::VerifyError::MissingContext`]
+    /// (caller misconfiguration, mirroring Square/Twilio's context options);
+    /// malformed material fails with [`crate::VerifyError::InvalidSecret`].
+    ///
+    /// This crate never fetches key material itself (`spec.md` §7): the caller
+    /// supplies bytes that were already obtained and vetted out-of-band.
+    pub verifying_material: Option<VerifyingKeyMaterial>,
 }
 
 impl Default for VerifyOptions {
@@ -102,6 +154,7 @@ impl Default for VerifyOptions {
             clock: None,
             request_url: None,
             form_params: None,
+            verifying_material: None,
         }
     }
 }
@@ -150,6 +203,14 @@ impl VerifyOptions {
         self
     }
 
+    /// Sets [`VerifyOptions::verifying_material`], the asymmetric public-key
+    /// /certificate material required by public-key schemes (currently
+    /// SendGrid's ECDSA P-256 key; PayPal's X.509 certificate when it lands).
+    pub fn with_verifying_material(mut self, material: VerifyingKeyMaterial) -> Self {
+        self.verifying_material = Some(material);
+        self
+    }
+
     /// Resolves "now" in unix seconds from the injected clock, falling back to
     /// the real wall clock under `std`.
     #[must_use]
@@ -174,6 +235,9 @@ impl fmt::Debug for VerifyOptions {
                 "form_params_count",
                 &self.form_params.as_ref().map(|p| p.len()),
             )
+            // VerifyingKeyMaterial has its own redacted Debug (variant name +
+            // byte length only; never the key/certificate bytes).
+            .field("verifying_material", &self.verifying_material)
             .finish()
     }
 }
@@ -183,7 +247,7 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
-    use super::VerifyOptions;
+    use super::{VerifyOptions, VerifyingKeyMaterial};
     use crate::test_helpers::{FixedClock, epoch};
 
     #[test]
@@ -201,6 +265,7 @@ mod tests {
             clock: Some(Arc::new(FixedClock(epoch(1_700_000_000)))),
             request_url: None,
             form_params: None,
+            verifying_material: None,
         };
         assert_eq!(opts.now(), fixed.0);
     }
@@ -218,6 +283,29 @@ mod tests {
     fn debug_does_not_print_request_url_value() {
         let opts = VerifyOptions::default().with_request_url("https://internal.example/hook");
         assert!(!format!("{opts:?}").contains("internal.example"));
+    }
+
+    #[test]
+    fn builder_sets_verifying_material() {
+        let key = b"\x30\x59\x13".to_vec();
+        let opts = VerifyOptions::default()
+            .with_verifying_material(VerifyingKeyMaterial::EcdsaP256PublicKey(key.clone()));
+        assert_eq!(
+            opts.verifying_material,
+            Some(VerifyingKeyMaterial::EcdsaP256PublicKey(key))
+        );
+        assert!(VerifyOptions::default().verifying_material.is_none());
+    }
+
+    #[test]
+    fn debug_redacts_verifying_material_bytes() {
+        // Key/certificate bytes must not leak through Debug — only the variant
+        // name and byte length are shown.
+        let opts = VerifyOptions::default()
+            .with_verifying_material(VerifyingKeyMaterial::EcdsaP256PublicKey(vec![0xde, 0xad]));
+        let debug = format!("{opts:?}");
+        assert!(!debug.contains("222")); // 0xde, 0xad decimal concatenated
+        assert!(debug.contains("<2 bytes>"));
     }
 
     #[test]
