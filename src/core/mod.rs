@@ -5,6 +5,8 @@
 //! Changes here affect every provider and are treated as high-risk; see
 //! `spec.md` §2 for the normative contract.
 
+#[cfg(any(feature = "tower", feature = "actix"))]
+pub(crate) mod adapter_utils;
 pub(crate) mod crypto;
 pub(crate) mod error;
 pub(crate) mod headers;

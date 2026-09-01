@@ -101,6 +101,7 @@ use actix_web::{
     web::Bytes,
 };
 
+use crate::core::adapter_utils::rejection_status;
 use crate::{
     HeaderMap, Provider, Secret, VerifyError, VerifyOptions, providers::signature_header_names,
 };
@@ -220,38 +221,17 @@ impl ResponseError for WebhookVerificationError {
     fn status_code(&self) -> StatusCode {
         match &self.0 {
             Rejection::BodyRead => StatusCode::BAD_REQUEST,
-            Rejection::Verify(error) => rejection_status(error),
+            // The status class is a hard-coded constant (400/401/500), so
+            // conversion cannot fail; the fallback still fails closed with
+            // 500 if it ever did.
+            Rejection::Verify(error) => StatusCode::from_u16(rejection_status(error))
+                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
         }
     }
 
     // The default `error_response` builds an empty-bodied response from
     // `status_code`; that is exactly what we want (spec.md §2.1 / tower
     // adapter parity), so it is not overridden.
-}
-
-/// Maps a verification outcome to its rejection status code — identical to
-/// the tower adapter's table (rationale per class in the module docs).
-///
-/// The match is exhaustive over the in-crate enum; adding a variant will
-/// surface here at compile time so its status class is chosen deliberately.
-fn rejection_status(error: &VerifyError) -> StatusCode {
-    match error {
-        // Malformed request: missing/unparseable signature headers.
-        VerifyError::MissingHeader { .. }
-        | VerifyError::MalformedHeader { .. }
-        | VerifyError::BadEncoding { .. } => StatusCode::BAD_REQUEST,
-
-        // Authentication signals: wrong signature or stale timestamp.
-        VerifyError::SignatureMismatch | VerifyError::TimestampOutOfTolerance { .. } => {
-            StatusCode::UNAUTHORIZED
-        }
-
-        // Operator misconfiguration: unsupported/broken configuration, never
-        // the requester's fault. Still rejected — fail closed.
-        VerifyError::UnsupportedProvider
-        | VerifyError::InvalidSecret { .. }
-        | VerifyError::MissingContext { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-    }
 }
 
 /// Returns the name of the first header in `names` that occurs in `headers`
