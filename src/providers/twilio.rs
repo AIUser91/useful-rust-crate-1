@@ -412,7 +412,6 @@ mod tests {
         // reject a validly signed delivery. Pins the documented behavior.
         let options = crate::core::options::VerifyOptions {
             max_age: Some(std::time::Duration::ZERO),
-            clock: None,
             request_url: Some(OFFICIAL_URL.to_string()),
             form_params: Some(
                 OFFICIAL_PARAMS
@@ -420,6 +419,7 @@ mod tests {
                     .map(|&(k, v)| (k.to_string(), v.to_string()))
                     .collect(),
             ),
+            ..crate::core::options::VerifyOptions::default()
         };
         let result = verify(
             crate::Provider::Twilio,
