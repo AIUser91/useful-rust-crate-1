@@ -229,6 +229,12 @@ body, multi-value headers, etc.).
   default to 5 minutes)
 - Multiple `v1=` values may be present during secret rotation; a match on
   *any* is accepted.
+- Timestamp validation: `t` must be a pure ASCII-digit unix-seconds value,
+  validated through the shared timestamp parser. Sign-prefixed
+  (`t=+1700000000`), whitespace-padded, empty, or overflowing values are
+  rejected as `MalformedHeader` — the same fail-closed policy every other
+  timestamped provider applies (`spec.md` §4.4), regardless of whether a
+  signature over the non-canonical string would verify.
 
 ### GitHub
 

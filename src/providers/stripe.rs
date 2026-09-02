@@ -33,7 +33,7 @@ use crate::core::VerifyOptions;
 use crate::core::crypto::verify_hmac_sha256;
 use crate::core::error::VerifyError;
 use crate::core::headers::HeaderMap;
-use crate::core::replay::check_replay;
+use crate::core::replay::{check_replay, parse_timestamp};
 use crate::core::secret::Secret;
 
 /// The header carrying Stripe's signature.
@@ -158,12 +158,12 @@ fn parse_header(value: &str) -> Result<ParsedHeader<'_>, VerifyError> {
         }
     };
 
-    let timestamp = timestamp_raw
-        .parse::<u64>()
-        .map_err(|_| VerifyError::MalformedHeader {
-            header: SIGNATURE_HEADER,
-            reason: "timestamp is not a valid unix timestamp",
-        })?;
+    // `t` is "integer unix seconds" (`spec.md` §3); route it through the
+    // shared timestamp parser so sign-prefixed (`t=+1700000000`),
+    // whitespace-padded, and overflowing values fail closed exactly like
+    // every other timestamped provider (Slack, Zoom, Discord, SendGrid,
+    // Standard Webhooks, `Custom`).
+    let timestamp = parse_timestamp(SIGNATURE_HEADER, timestamp_raw)?;
 
     if signatures.is_empty() {
         return Err(VerifyError::MalformedHeader {
@@ -482,6 +482,23 @@ mod tests {
                 VerifyError::MalformedHeader {
                     header: SIGNATURE_HEADER,
                     reason: "timestamp is not a valid unix timestamp",
+                },
+            ),
+            (
+                // Sign-prefixed values (`+`) parse fine as u64 but are not
+                // "integer unix seconds"; rejected via the shared timestamp
+                // parser, matching every other timestamped provider.
+                format!("t=+{TIMESTAMP},v1={SIGNATURE}"),
+                VerifyError::MalformedHeader {
+                    header: SIGNATURE_HEADER,
+                    reason: "timestamp is not a valid unix timestamp",
+                },
+            ),
+            (
+                format!("t=99999999999999999999,v1={SIGNATURE}"),
+                VerifyError::MalformedHeader {
+                    header: SIGNATURE_HEADER,
+                    reason: "timestamp overflows unix seconds",
                 },
             ),
         ];
