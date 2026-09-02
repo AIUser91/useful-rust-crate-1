@@ -26,9 +26,9 @@ jobs:
             .
             fuzz
       - name: Build fuzz target (every PR)
-        run: cargo fuzz build -O
+        run: cargo fuzz build --target x86_64-unknown-linux-gnu -O
       - name: Timed fuzz run (nightly only)
         if: github.event_name == 'schedule'
         run: >
-          cargo fuzz run parse_and_verify -O -- -max_total_time=600
+          cargo fuzz run parse_and_verify --target x86_64-unknown-linux-gnu -O -- -max_total_time=600
           -rss_limit_mb=2560 -print_final_stats=1
