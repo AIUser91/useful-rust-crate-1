@@ -220,6 +220,13 @@ mod tests {
                     reason: "header is empty",
                 },
             ),
+            // Garbage value: not valid hexadecimal at all.
+            (
+                "not hex!!",
+                VerifyError::BadEncoding {
+                    reason: "signature is not valid hexadecimal",
+                },
+            ),
             // Valid hex but wrong decoded length (SHA-1 size = 20 bytes = 40 hex chars).
             (
                 "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
@@ -239,10 +246,7 @@ mod tests {
             assert_eq!(result, Err(expected), "input: {value:?}");
         }
 
-        for value in [
-            "not hex!!",
-            "5257a869e7ecebeda32affa62cdca3fa51cad7e77a0e56ff536d0ce8e108d8b",
-        ] {
+        for value in ["5257a869e7ecebeda32affa62cdca3fa51cad7e77a0e56ff536d0ce8e108d8b"] {
             let result = verify(
                 crate::Provider::Linear,
                 &[(SIGNATURE_HEADER, value)],
