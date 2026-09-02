@@ -222,6 +222,13 @@ mod tests {
                     reason: "header is empty",
                 },
             ),
+            // Garbage value: not valid base64 at all.
+            (
+                "not base64!!",
+                VerifyError::BadEncoding {
+                    reason: "signature is not valid standard base64",
+                },
+            ),
             // Valid base64 alphabet but wrong decoded length (SHA-1 size).
             (
                 "2jmj7l5rSw0yVb/vlWAYkK/YBwk=",
@@ -241,10 +248,7 @@ mod tests {
             assert_eq!(result, Err(expected), "input: {value:?}");
         }
 
-        for value in [
-            "not base64!!",
-            "dXEH6g6yUJ/CESIczphLijdXC211hsIsRvQ3nIsEPhc",
-        ] {
+        for value in ["dXEH6g6yUJ/CESIczphLijdXC211hsIsRvQ3nIsEPhc"] {
             let result = verify(
                 crate::Provider::Shopify,
                 &[(SIGNATURE_HEADER, value)],
