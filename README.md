@@ -156,7 +156,6 @@ for constrained targets:
 
 ```toml
 # no wall clock; supply your own Clock for timestamped providers
-webhook-verify = { version = "0.1", default-features = false, features = ["std"] }
 webhook-verify = { version = "0.1", default-features = false }
 ```
 
