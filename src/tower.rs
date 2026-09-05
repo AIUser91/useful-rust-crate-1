@@ -319,7 +319,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::{FixedClock, epoch};
+    #[cfg(feature = "paypal")]
+    use crate::VerifyingKeyMaterial;
+    use crate::test_helpers::{FixedClock, clocked_at, epoch};
     use ::http_body_util::Full;
     use ::tower::ServiceExt;
     use futures_executor::block_on;
@@ -602,17 +604,54 @@ mod tests {
 
     #[test]
     fn unsupported_provider_maps_to_internal_server_error() {
-        let svc = VerifyLayer::new(Provider::PayPal, Secret::new("unused")).layer(EchoLen);
-        let request = Request::builder()
-            .body(TestBody::new(Bytes::from_static(b"{}")))
-            .unwrap_or_else(|_| unreachable!("no headers to misbuild"));
-        block_on(async {
-            let response = svc
-                .oneshot(request)
-                .await
-                .unwrap_or_else(|error| panic!("{error}"));
-            assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
-        });
+        // PayPal stays "unsupported" only when the `paypal` feature is off;
+        // see the feature-gated variant below for the implemented path.
+        #[cfg(not(feature = "paypal"))]
+        {
+            let svc = VerifyLayer::new(Provider::PayPal, Secret::new("unused")).layer(EchoLen);
+            let request = Request::builder()
+                .body(TestBody::new(Bytes::from_static(b"{}")))
+                .unwrap_or_else(|_| unreachable!("no headers to misbuild"));
+            block_on(async {
+                let response = svc
+                    .oneshot(request)
+                    .await
+                    .unwrap_or_else(|error| panic!("{error}"));
+                assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+            });
+        }
+        #[cfg(feature = "paypal")]
+        {
+            let cert = include_bytes!("../tests/data/paypal_test_cert.pem");
+            // Clock pinned to the vector's transmission time (replay window).
+            let options = clocked_at(1_715_836_763, None)
+                .with_webhook_id("0NH55953DH663215D")
+                .with_verifying_material(VerifyingKeyMaterial::X509Certificate(cert.to_vec()));
+            let svc = VerifyLayer::with_options(Provider::PayPal, Secret::new("unused"), options)
+                .layer(EchoLen);
+            let body = include_bytes!("../tests/data/paypal_docs_body.json");
+            let request = Request::builder()
+                .header(
+                    "PayPal-Transmission-Id",
+                    "db49fb10-1343-11ef-ac58-e32457403f67",
+                )
+                .header("PayPal-Transmission-Time", "2024-05-16T05:19:23Z")
+                .header(
+                    "PayPal-Transmission-Sig",
+                    "aGYe/s6lwrASh2zyTRIAz8Edo705ezMKekirejT08ev3VXdWAkq4JWADiNPUGelx5qrEKxC7mPIHmAwQ5hOT6unhY9n33M/DbXTKGsuITPdXRA7qYVmc2wsIp68BpzB6pC6+5vt/YLQvflsrwrutGa0KyZc5FinuYNN8pTNomv4uiygasWqfnDyKViKQPNZecowag6tY/9pj7+bgBu/joBpYUq0+cQxfGqNnlvywBJ7HCOf4edeTIvM/c1CvvAHGtNTU54kLjWGue640twn6iXPL8tnaABZ8Fr9m0z87v8oY0vBobERV0Yu8thUToKhvQEFF26Rckqy07VVddg1CmA==",
+                )
+                .header("PayPal-Cert-Url", "https://example.invalid/cert-url")
+                .header("PayPal-Auth-Algo", "SHA256withRSA")
+                .body(TestBody::new(Bytes::from_static(body)))
+                .unwrap_or_else(|_| unreachable!("static parts build a valid request"));
+            block_on(async {
+                let response = svc
+                    .oneshot(request)
+                    .await
+                    .unwrap_or_else(|error| panic!("{error}"));
+                assert_eq!(response.status(), StatusCode::OK);
+            });
+        }
     }
 
     // --- unit-level checks ----------------------------------------------------

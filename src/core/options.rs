@@ -145,6 +145,16 @@ pub struct VerifyOptions {
     /// This crate never fetches key material itself (`spec.md` §7): the caller
     /// supplies bytes that were already obtained and vetted out-of-band.
     pub verifying_material: Option<VerifyingKeyMaterial>,
+    /// PayPal's webhook ID, required by PayPal's signed-string construction
+    /// (`spec.md` §3). It is *not* a request header or body field — it is the
+    /// ID of the webhook subscription (shown in the PayPal Developer Portal
+    /// for the listener URL) and must be supplied by the caller, mirroring
+    /// Square/Twilio's URL context.
+    ///
+    /// Required-but-absent for `Provider::PayPal` fails closed with
+    /// [`crate::VerifyError::MissingContext`]. Providers whose scheme does not
+    /// sign a webhook ID document that this option has no effect on them.
+    pub webhook_id: Option<String>,
 }
 
 impl Default for VerifyOptions {
@@ -155,6 +165,7 @@ impl Default for VerifyOptions {
             request_url: None,
             form_params: None,
             verifying_material: None,
+            webhook_id: None,
         }
     }
 }
@@ -211,6 +222,13 @@ impl VerifyOptions {
         self
     }
 
+    /// Sets [`VerifyOptions::webhook_id`], PayPal's webhook-subscription ID,
+    /// required by PayPal's signed-string construction (see the field docs).
+    pub fn with_webhook_id(mut self, webhook_id: impl Into<String>) -> Self {
+        self.webhook_id = Some(webhook_id.into());
+        self
+    }
+
     /// Resolves "now" in unix seconds from the injected clock, falling back to
     /// the real wall clock under `std`.
     #[must_use]
@@ -238,6 +256,9 @@ impl fmt::Debug for VerifyOptions {
             // VerifyingKeyMaterial has its own redacted Debug (variant name +
             // byte length only; never the key/certificate bytes).
             .field("verifying_material", &self.verifying_material)
+            // The webhook ID is not secret, but Debug stays minimal and
+            // presence-only, like request_url.
+            .field("webhook_id_set", &self.webhook_id.is_some())
             .finish()
     }
 }
@@ -266,6 +287,7 @@ mod tests {
             request_url: None,
             form_params: None,
             verifying_material: None,
+            webhook_id: None,
         };
         assert_eq!(opts.now(), fixed.0);
     }
@@ -295,6 +317,13 @@ mod tests {
             Some(VerifyingKeyMaterial::EcdsaP256PublicKey(key))
         );
         assert!(VerifyOptions::default().verifying_material.is_none());
+    }
+
+    #[test]
+    fn builder_sets_webhook_id() {
+        let opts = VerifyOptions::default().with_webhook_id("0NH55953DH663215D");
+        assert_eq!(opts.webhook_id.as_deref(), Some("0NH55953DH663215D"));
+        assert!(VerifyOptions::default().webhook_id.is_none());
     }
 
     #[test]

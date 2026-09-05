@@ -13,12 +13,14 @@ libfuzzer-sys = "0.4"
 [dependencies.webhook-verify]
 path = ".."
 
-# The SendGrid provider is part of the default fuzz surface: the ECDSA/SPKI
-# parsing and fail-closed paths get constant coverage, and the feature flag
-# keeps the `cfg` blocks in the target built both ways.
+# The SendGrid and PayPal providers are part of the default fuzz surface: the
+# ECDSA/SPKI and RSA/X.509 parsing plus their fail-closed paths get constant
+# coverage, and the feature flags keep the `cfg` blocks in the target built
+# both ways.
 [features]
-default = ["sendgrid"]
+default = ["sendgrid", "paypal"]
 sendgrid = ["webhook-verify/sendgrid"]
+paypal = ["webhook-verify/paypal"]
 
 [[bin]]
 name = "parse_and_verify"

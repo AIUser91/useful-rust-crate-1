@@ -338,7 +338,9 @@ mod tests {
     use super::*;
     // Aliased: a plain `use ..::test` would make `#[test]` resolve to the
     // actix module instead of the built-in attribute.
-    use crate::test_helpers::{FixedClock, epoch};
+    #[cfg(feature = "paypal")]
+    use crate::VerifyingKeyMaterial;
+    use crate::test_helpers::{FixedClock, clocked_at, epoch};
     use actix_web::{App, HttpResponse, http, test as aw_test, web};
 
     /// GitHub's documented example vector
@@ -586,6 +588,9 @@ mod tests {
         assert_eq!(res.status(), StatusCode::OK);
     }
 
+    // PayPal stays "unsupported" only when the `paypal` feature is off; the
+    // mapping of that error class to 500 lives in core::adapter_utils tests.
+    #[cfg(not(feature = "paypal"))]
     #[actix_web::test]
     async fn unsupported_provider_maps_to_internal_server_error() {
         let app = aw_test::init_service(
@@ -599,6 +604,42 @@ mod tests {
             .to_request();
         let res = aw_test::call_service(&app, req).await;
         assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[cfg(feature = "paypal")]
+    #[actix_web::test]
+    async fn paypal_verifies_through_the_extractor() {
+        let cert = include_bytes!("../tests/data/paypal_test_cert.pem");
+        // Reuse the documented PayPal construction's options plus the vector's
+        // headers (see src/providers/paypal.rs tests). The clock is pinned to
+        // the vector's transmission time so the replay window is satisfied.
+        let config = WebhookConfig::with_options(
+            Provider::PayPal,
+            Secret::new("unused"),
+            clocked_at(1_715_836_763, None)
+                .with_webhook_id("0NH55953DH663215D")
+                .with_verifying_material(VerifyingKeyMaterial::X509Certificate(cert.to_vec())),
+        );
+        let app = aw_test::init_service(
+            App::new()
+                .app_data(config)
+                .route("/", web::post().to(echo_len)),
+        )
+        .await;
+        let body = include_bytes!("../tests/data/paypal_docs_body.json");
+        let req = aw_test::TestRequest::post()
+            .insert_header(("PayPal-Transmission-Id", "db49fb10-1343-11ef-ac58-e32457403f67"))
+            .insert_header(("PayPal-Transmission-Time", "2024-05-16T05:19:23Z"))
+            .insert_header((
+                "PayPal-Transmission-Sig",
+                "aGYe/s6lwrASh2zyTRIAz8Edo705ezMKekirejT08ev3VXdWAkq4JWADiNPUGelx5qrEKxC7mPIHmAwQ5hOT6unhY9n33M/DbXTKGsuITPdXRA7qYVmc2wsIp68BpzB6pC6+5vt/YLQvflsrwrutGa0KyZc5FinuYNN8pTNomv4uiygasWqfnDyKViKQPNZecowag6tY/9pj7+bgBu/joBpYUq0+cQxfGqNnlvywBJ7HCOf4edeTIvM/c1CvvAHGtNTU54kLjWGue640twn6iXPL8tnaABZ8Fr9m0z87v8oY0vBobERV0Yu8thUToKhvQEFF26Rckqy07VVddg1CmA==",
+            ))
+            .insert_header(("PayPal-Cert-Url", "https://example.invalid/cert-url"))
+            .insert_header(("PayPal-Auth-Algo", "SHA256withRSA"))
+            .set_payload(Bytes::from_static(body))
+            .to_request();
+        let res = aw_test::call_service(&app, req).await;
+        assert_eq!(res.status(), StatusCode::OK);
     }
 
     #[actix_web::test]
