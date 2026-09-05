@@ -190,20 +190,26 @@ pub(crate) fn verify(
                 header: scheme.signature_header,
             })?;
 
-    let provided_signature = parse_signature(scheme, signature_value)?;
-
-    // The timestamp header is fetched and parsed up front so a missing or
-    // malformed one is reported as such even when the signature would also
-    // have failed — matching how built-in timestamped schemes report.
-    let timestamp = match scheme.timestamp_header {
-        Some(timestamp_header) => {
-            let raw = headers
+    // The timestamp header is fetched up front so a missing one is reported
+    // as such even when the signature would also have failed — matching how
+    // built-in timestamped schemes report. Its value is parsed after the
+    // signature, same parse order as the built-ins.
+    let timestamp_raw = match scheme.timestamp_header {
+        Some(timestamp_header) => Some((
+            timestamp_header,
+            headers
                 .get(timestamp_header)
                 .ok_or(VerifyError::MissingHeader {
                     header: timestamp_header,
-                })?;
-            Some(parse_timestamp(timestamp_header, raw)?)
-        }
+                })?,
+        )),
+        None => None,
+    };
+
+    let provided_signature = parse_signature(scheme, signature_value)?;
+
+    let timestamp = match timestamp_raw {
+        Some((timestamp_header, raw)) => Some(parse_timestamp(timestamp_header, raw)?),
         None => None,
     };
 
@@ -708,6 +714,27 @@ mod tests {
         );
         assert_eq!(
             missing_timestamp,
+            Err(VerifyError::MissingHeader {
+                header: ts_scheme::TS_HEADER
+            })
+        );
+    }
+
+    #[test]
+    fn malformed_signature_plus_missing_timestamp_reports_missing_header() {
+        // When the signature is present but malformed *and* the timestamp
+        // header is absent, the timestamp header (like all built-in
+        // timestamped schemes) is reported as missing rather than the
+        // signature as malformed — the header lookup precedes parsing.
+        let result = verify_custom(
+            &ts_scheme_config(),
+            &[(ts_scheme::HEADER.to_string(), "garbage".to_string())],
+            ts_scheme::PING_BODY,
+            ts_scheme::SECRET,
+            clocked_at(ts_scheme::TIMESTAMP, Some(Duration::from_secs(300))),
+        );
+        assert_eq!(
+            result,
             Err(VerifyError::MissingHeader {
                 header: ts_scheme::TS_HEADER
             })
