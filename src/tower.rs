@@ -669,6 +669,19 @@ mod tests {
     }
 
     #[test]
+    fn unparseable_header_name_fails_closed_as_ambiguous() {
+        // A header-name string the http crate refuses to parse (embedded
+        // whitespace) must fail closed as "ambiguous" per §4.4 — the parse-
+        // error arm exists precisely so attacker-supplied garbage can never
+        // turn into a permissive lookup.
+        let headers = ::http::HeaderMap::new();
+        assert_eq!(
+            conflicting_signature_header(&headers, &["x-hub-signature-256 invalid"]),
+            Some("x-hub-signature-256 invalid")
+        );
+    }
+
+    #[test]
     fn debug_output_never_contains_secrets() {
         let layer = VerifyLayer::<Bytes>::with_options(
             Provider::GitHub,
