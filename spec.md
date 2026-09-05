@@ -62,7 +62,7 @@ impl Secret {
 /// Caller-supplied asymmetric verification material (spec §7).
 #[non_exhaustive]
 pub enum VerifyingKeyMaterial {
-    X509Certificate(Vec<u8>),        // PayPal (planned)
+    X509Certificate(Vec<u8>),         // PayPal (shipped, feature `paypal`)
     EcdsaP256PublicKey(Vec<u8>),      // SendGrid (shipped, feature `sendgrid`)
 }
 // Debug redacts the key/certificate bytes (variant name + byte length only).
@@ -85,10 +85,18 @@ pub struct VerifyOptions {  // #[non_exhaustive]: configure via Default + the
     pub form_params: Option<Vec<(String, String)>>,
     /// Asymmetric public-key/certificate material for schemes that verify
     /// against a configured key rather than a shared secret (currently
-    /// SendGrid's ECDSA P-256 key; PayPal when it lands). Required-but-absent
-    /// fails closed with `MissingContext`; malformed material with
-    /// `InvalidSecret`. This crate never fetches key material (§7).
+    /// SendGrid's ECDSA P-256 key, PayPal's X.509 certificate).
+    /// Required-but-absent fails closed with `MissingContext`; malformed
+    /// material with `InvalidSecret`. This crate never fetches key material
+    /// (§7). See §3.
     pub verifying_material: Option<VerifyingKeyMaterial>,
+    /// Merchant/webhook-subscription ID required by PayPal's signed-string
+    /// construction (`{transmission_id}|{transmission_time}|{webhook_id}|
+    /// {crc32}`). The webhook ID does not travel in the request — it is the
+    /// subscription ID configured in the PayPal Developer Portal — so the
+    /// caller supplies it here. Required-but-absent for `Provider::PayPal`
+    /// fails closed with `MissingContext`. No effect on other providers.
+    pub webhook_id: Option<String>,
 }
 
 impl Default for VerifyOptions {
@@ -99,6 +107,7 @@ impl Default for VerifyOptions {
             request_url: None,
             form_params: None,
             verifying_material: None,
+            webhook_id: None,
         }
     }
 }
@@ -124,8 +133,9 @@ pub fn verify(
 Implementation status (kept in sync with the code — do not let this drift):
 
 - All `Provider` variants ship up front so adding providers later is
-  non-breaking. A variant without an implementation yet fails closed:
-  `verify()` returns `UnsupportedProvider` for it.
+  non-breaking. A variant whose implementation is disabled by a crate
+  feature flag fails closed: `verify()` returns `UnsupportedProvider` for it
+  (currently PayPal/SendGrid without their features).
 - `Custom(CustomScheme)` ships per §2.2: declarative hash/encoding/prefix/
   header configuration plus a caller-supplied signed-string function, with
   the same constant-time comparison and fail-closed parsing guarantees as
@@ -361,15 +371,60 @@ Discord's official SDKs (`discord-interactions-js`,
 
 ### PayPal
 
-- Uses asymmetric certificate-based verification requiring a configured
-  X.509 certificate; the certificate-fetch design question is resolved (§7):
-  the crate never fetches key material — the caller supplies an already
-  vetted certificate via `VerifyOptions::verifying_material`
-  (`VerifyingKeyMaterial::X509Certificate`). The exact signed-string
-  construction must be pinned against official sources before the provider
-  lands; until then, `Provider::PayPal` fails closed with
-  `UnsupportedProvider` (available meanwhile as a documented `CustomScheme`
-  recipe).
+Source: PayPal's official "Self verification method" documentation
+(<https://developer.paypal.com/api/rest/webhooks/rest/#message-verification>)
+and the sample postback code in that same doc page. The crate never performs
+a postback or any network I/O (see the resolved design question in §7): the
+certificate is supplied by the caller, mirroring SendGrid (§3).
+
+- Headers: `PayPal-Transmission-Id`, `PayPal-Transmission-Time` (RFC 3339
+  instant, e.g. `2024-05-16T05:19:23Z`), `PayPal-Transmission-Sig` (base64,
+  standard alphabet, padded), `PayPal-Cert-Url`, `PayPal-Auth-Algo`. All five
+  are required; any missing header fails closed with `MissingHeader`.
+- `PayPal-Auth-Algo` must equal `SHA256withRSA` (matched case-insensitively);
+  anything else fails closed with `MalformedHeader` so a future algorithm
+  change is rejected rather than silently mis-verified.
+- Signed string: `"{transmission_id}|{transmission_time}|{webhook_id}|{crc32}"`
+  — the first two fields verbatim from their headers, the webhook ID from
+  `VerifyOptions::webhook_id` (it does not travel in the request; see below),
+  and the CRC-32 checksum rendered in **decimal**. The CRC-32 is the IEEE
+  802.3/zlib polynomial (as the official sample code computes) over the
+  **raw body bytes** (§4.2).
+- Algorithm: RSASSA-PKCS1-v1_5 with SHA-256, i.e. Java-style
+  `SHA256withRSA`, over the signed string. The signature bytes are exactly
+  the modulus length; other lengths fail closed with `BadEncoding`.
+- Key material: the X.509 certificate at `PayPal-Cert-Url`. It is a
+  required *header* (fail-closed on `MissingHeader` if absent) but it is
+  **never fetched**: the caller supplies an already vetted certificate
+  (typically downloaded from a personally allow-listed `PayPal-Cert-Url`) as
+  `VerifyingKeyMaterial::X509Certificate` (DER or PEM; only the embedded RSA
+  public key is used; no chain validation or hostname checking). Missing
+  material fails closed with `MissingContext`; unparseable certificates or
+  non-RSA certificates fail closed with `InvalidSecret`.
+- `VerifyOptions::webhook_id` is the PayPal webhook-subscription ID shown in
+  the Developer Portal — required for `Provider::PayPal`; missing
+  (`MissingContext`) fails closed. It is part of the signed string, so a
+  wrong ID rejects as a signature mismatch.
+- The shared `Secret` argument is accepted for API uniformity and ignored
+  (public-key scheme, like Discord).
+- Replay protection: PayPal's docs ["Compare timestamps to prevent replay
+  attacks"](https://developer.paypal.com/community/blog/paypal-has-updated-its-webhook-verification-endpoint/)
+  recommend rejecting stale `PayPal-Transmission-Time` values but define no
+  numeric window, so the shared default tolerance (symmetric
+  `|now - t| <= max_age`, 300s, injectable clock) is applied. The RFC 3339
+  instant is normalized to UTC (offsets and fractional seconds — truncated,
+  not rounded — are supported) before the window applies.
+- Feature gate: shipped behind `features = ["paypal"]` (optional `rsa`,
+  `x509-parser`, `crc32fast`; `no_std`-compatible). Without the feature,
+  `Provider::PayPal` fails closed with `UnsupportedProvider`.
+- Test-vector provenance: PayPal publishes no byte-exact *signed* test vector
+  (their example signature covers a transmission string built from a body the
+  docs stress must be the exact received bytes, which cannot be reconstructed
+  from the docs). The ci tests therefore freeze a locally generated
+  certificate + signature over exactly the documented construction, using
+  PayPal's own published example body, transmission ID, transmission time,
+  and webhook ID; the CRC-32 is cross-checked independently (Python
+  `zlib.crc32`). The private key is never committed.
 
 ### SendGrid
 
@@ -555,11 +610,14 @@ A provider implementation is not mergeable until it has:
   Status: **SendGrid shipped (2026-09) behind `features = ["sendgrid"]`**
   — `VerifyingKeyMaterial::EcdsaP256PublicKey`, the `verifying_material`
   option, and the ECDSA P-256 verification path are implemented with the
-  provider's own test vector (see §3 SendGrid row). **PayPal still pending:**
-  the `X509Certificate` variant and the `verifying_material` plumbing are
-  in place, ready for its scheme to be pinned to official sources. The API
-  shipped matches the 2026-08 sketch below (with key/certificate bytes
-  redacted from `Debug` output on the enum):
+  provider's own test vector (see §3 SendGrid row). **PayPal shipped
+  (2026-10) behind `features = ["paypal"]`** — `X509Certificate`
+  certificate material, the `webhook_id` option, and the RSASSA-PKCS1-v1_5
+  SHA-256 verification path over the documented
+  `{transmission_id}|{transmission_time}|{webhook_id}|{crc32}` construction
+  (see §3 PayPal row; RFC 3339 transmission-time parsing lives in
+  `src/core/replay.rs`). The API shipped matches the 2026-08 sketch below
+  (with key/certificate bytes redacted from `Debug` output on the enum):
 
   ```rust
   /// Caller-supplied asymmetric verification material (spec §7).
@@ -583,6 +641,9 @@ A provider implementation is not mergeable until it has:
       /// than a shared secret (currently SendGrid; PayPal when it lands).
       /// This crate never fetches anything from the network.
       pub verifying_material: Option<VerifyingKeyMaterial>,
+      /// PayPal's webhook-subscription ID, required by its signed-string
+      /// construction (does not travel in the request).
+      pub webhook_id: Option<String>,
   }
   ```
 
@@ -594,9 +655,10 @@ A provider implementation is not mergeable until it has:
   base64 or non-DER signatures are `BadEncoding`; everything else is
   `SignatureMismatch`.
 
-  Implementation notes: asymmetric verification uses a feature-gated
-  RustCrypto dependency (`p256`, optional `no_std`-compatible — see the
-  crate's `Cargo.toml`; `rsa` will be needed when PayPal lands). The
+  Implementation notes: asymmetric verification uses feature-gated
+  RustCrypto dependencies (`p256`, optional `no_std`-compatible; `rsa` +
+  `x509-parser` + `crc32fast` behind the `paypal` feature — see the crate's
+  `Cargo.toml`). The
   optional `webhook-verify-fetch` companion crate remains future work if
   automated key rotation handling is ever requested — it stays out of this
   crate either way.

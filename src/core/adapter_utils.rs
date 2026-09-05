@@ -39,3 +39,59 @@ pub(crate) fn rejection_status(error: &VerifyError) -> u16 {
         | VerifyError::MissingContext { .. } => 500,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::rejection_status;
+    use crate::VerifyError;
+
+    fn status_of(error: VerifyError) -> u16 {
+        rejection_status(&error)
+    }
+
+    #[test]
+    fn malformed_request_class_maps_to_400() {
+        assert_eq!(
+            status_of(VerifyError::MissingHeader {
+                header: "X-Signature"
+            }),
+            400
+        );
+        assert_eq!(
+            status_of(VerifyError::MalformedHeader {
+                header: "X-Signature",
+                reason: "boom"
+            }),
+            400
+        );
+        assert_eq!(status_of(VerifyError::BadEncoding { reason: "boom" }), 400);
+    }
+
+    #[test]
+    fn auth_signal_class_maps_to_401() {
+        assert_eq!(status_of(VerifyError::SignatureMismatch), 401);
+        assert_eq!(
+            status_of(VerifyError::TimestampOutOfTolerance {
+                skew: std::time::Duration::from_secs(1000),
+                max_age: std::time::Duration::from_secs(300),
+            }),
+            401
+        );
+    }
+
+    #[test]
+    fn operator_misconfiguration_class_maps_to_500() {
+        // UnsupportedProvider keeps its 500 class even once a feature (e.g.
+        // `paypal`) implements the provider — the mapping is about the error
+        // class, not the current build's provider set.
+        assert_eq!(status_of(VerifyError::UnsupportedProvider), 500);
+        assert_eq!(
+            status_of(VerifyError::InvalidSecret { reason: "boom" }),
+            500
+        );
+        assert_eq!(
+            status_of(VerifyError::MissingContext { reason: "boom" }),
+            500
+        );
+    }
+}

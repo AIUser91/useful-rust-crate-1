@@ -87,7 +87,7 @@ hand-copied signing-string logic to get wrong.
 | Square | HMAC-SHA256 over notification URL + body, base64, `X-Square-HmacSha256-Signature` (needs `VerifyOptions::request_url`) | ✅ |
 | Twilio | HMAC-SHA1 over URL + sorted form params, `X-Twilio-Signature` (needs `VerifyOptions::request_url` + `form_params`) | ✅ |
 | Discord | Ed25519 (public-key), no shared secret | ✅ |
-| PayPal | Certificate-based / API verification | 🚧 planned (design settled, spec §7) |
+| PayPal | RSASSA-PKCS1-v1_5 SHA-256 over `transmission_id|time|webhook_id|crc32(body)`, X.509 cert + webhook ID via `VerifyOptions::verifying_material` + `webhook_id` (needs `paypal` feature) | ✅ |
 | SendGrid | ECDSA P-256 over `timestamp.body`, public key via `VerifyOptions::verifying_material` (needs `sendgrid` feature) | ✅ |
 | Zoom | HMAC-SHA256, `v0=` scheme, `x-zm-signature` + timestamp | ✅ |
 | Dropbox | HMAC-SHA256, `X-Dropbox-Signature` | ✅ |
@@ -108,6 +108,25 @@ webhook-verify = { version = "0.1", features = ["sendgrid"] }
 
 For `no_std + alloc` targets, keep `default-features = false` together with
 `features = ["sendgrid"]`.
+
+PayPal verification is compiled only with the crate feature:
+
+```toml
+[dependencies]
+webhook-verify = { version = "0.1", features = ["paypal"] }
+```
+
+It verifies against the caller-supplied certificate (the crate never fetches
+`PayPal-Cert-Url` — see `spec.md` §7) and needs both the webhook
+subscription ID and the certificate to be configured:
+
+```rust,ignore
+let opts = VerifyOptions::default()
+    .with_webhook_id("your-webhook-subscription-id")
+    .with_verifying_material(VerifyingKeyMaterial::X509Certificate(cert_pem_bytes.to_vec()));
+
+let result = verify(Provider::PayPal, &headers, raw_body, &Secret::new("unused"), opts);
+```
 
 ## Installation
 

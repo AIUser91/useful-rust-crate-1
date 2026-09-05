@@ -10,6 +10,8 @@ mod discord;
 mod dropbox;
 mod github;
 mod linear;
+#[cfg(feature = "paypal")]
+mod paypal;
 #[cfg(feature = "sendgrid")]
 mod sendgrid;
 mod shopify;
@@ -64,7 +66,12 @@ pub enum Provider {
     /// was signed with the private key corresponding to the *public* key in
     /// [`crate::Secret`] — see the provider module's security-model notes.
     Discord,
-    /// PayPal (certificate-based; see `spec.md` §7 open questions).
+    /// PayPal (certificate-based RSASSA-PKCS1-v1_5 SHA-256; webhook ID and
+    /// certificate via `VerifyOptions::webhook_id` /
+    /// `VerifyOptions::verifying_material`).
+    ///
+    /// Requires the `paypal` crate feature; without it this variant fails
+    /// closed with [`VerifyError::UnsupportedProvider`].
     PayPal,
     /// SendGrid (ECDSA P-256; key via `VerifyOptions::verifying_material`).
     ///
@@ -117,9 +124,9 @@ impl fmt::Display for Provider {
 /// — see the ambiguity contract on [`crate::HeaderMap`] and `spec.md` §4.4,
 /// which the first-match-only lookup cannot detect on its own.
 ///
-/// Returns an empty list for providers that are not implemented yet; their
-/// verification fails closed with [`VerifyError::UnsupportedProvider`]
-/// regardless.
+/// Returns an empty list for providers whose implementation is disabled by a
+/// feature flag; their verification fails closed with
+/// [`VerifyError::UnsupportedProvider`] regardless.
 #[cfg(any(feature = "tower", feature = "actix"))]
 pub(crate) fn signature_header_names(provider: &Provider) -> Vec<&'static str> {
     match provider {
@@ -151,6 +158,15 @@ pub(crate) fn signature_header_names(provider: &Provider) -> Vec<&'static str> {
         Provider::SendGrid => {
             vec![sendgrid::SIGNATURE_HEADER, sendgrid::TIMESTAMP_HEADER]
         }
+        #[cfg(feature = "paypal")]
+        Provider::PayPal => vec![
+            paypal::TRANSMISSION_ID_HEADER,
+            paypal::TRANSMISSION_TIME_HEADER,
+            paypal::TRANSMISSION_SIG_HEADER,
+            paypal::CERT_URL_HEADER,
+            paypal::AUTH_ALGO_HEADER,
+        ],
+        #[cfg(not(feature = "paypal"))]
         Provider::PayPal => Vec::new(),
         #[cfg(not(feature = "sendgrid"))]
         Provider::SendGrid => Vec::new(),
@@ -179,9 +195,9 @@ pub(crate) fn signature_header_names(provider: &Provider) -> Vec<&'static str> {
 /// decoded signature does not match the expected value. Providers with
 /// timestamp-based replay protection return
 /// [`VerifyError::TimestampOutOfTolerance`] when the signed timestamp is too
-/// old. [`VerifyError::UnsupportedProvider`] is returned for providers that
-/// have no implementation yet (PayPal) or whose implementation is disabled by
-/// a crate feature (SendGrid without `sendgrid`). [`VerifyError::InvalidSecret`]
+/// old. [`VerifyError::UnsupportedProvider`] is returned for providers whose
+/// implementation is disabled by a crate feature (PayPal without `paypal`,
+/// SendGrid without `sendgrid`). [`VerifyError::InvalidSecret`]
 /// is returned when the secret is not in the format the provider requires.
 /// [`VerifyError::MissingContext`] is returned when provider-specific request
 /// context (e.g. Square's notification URL) was not supplied via
@@ -207,12 +223,15 @@ pub fn verify(
         }
         Provider::Twilio => twilio::verify(headers, raw_body, secret, &options),
         Provider::Dropbox => dropbox::verify(headers, raw_body, secret, &options),
+        #[cfg(feature = "paypal")]
+        Provider::PayPal => paypal::verify(headers, raw_body, secret, &options),
+        #[cfg(not(feature = "paypal"))]
+        Provider::PayPal => Err(VerifyError::UnsupportedProvider),
         #[cfg(feature = "sendgrid")]
         Provider::SendGrid => sendgrid::verify(headers, raw_body, secret, &options),
         #[cfg(not(feature = "sendgrid"))]
         Provider::SendGrid => Err(VerifyError::UnsupportedProvider),
         Provider::Custom(scheme) => custom::verify(&scheme, headers, raw_body, secret, &options),
-        Provider::PayPal => Err(VerifyError::UnsupportedProvider),
     }
 }
 

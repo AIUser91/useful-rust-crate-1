@@ -110,8 +110,29 @@ fuzz_target!(|data: &[u8]| {
     attempt(Provider::Twilio, &headers, body, WELL_FORMED_SECRET, &twilio_options);
     attempt(Provider::Twilio, &headers, body, WELL_FORMED_SECRET, &VerifyOptions::default());
 
-    // PayPal is not implemented yet; its fail-closed `UnsupportedProvider`
-    // path must also never panic on arbitrary input.
+    // PayPal requires `webhook_id` + an X.509 certificate (never fetched; the
+    // caller supplies it). With a constant valid test certificate, arbitrary
+    // header/body bytes exercise the RFC 3339 timestamp, base64, CRC-32, and
+    // RSA/X.509 parsing paths; without the context, the MissingContext
+    // fail-closed path is covered.
+    #[cfg(feature = "paypal")]
+    {
+        const PAYPAL_CERT_PEM: &[u8] = include_bytes!("../../tests/data/paypal_test_cert.pem");
+        let paypal_options = VerifyOptions::default()
+            .with_webhook_id("0NH55953DH663215D")
+            .with_verifying_material(VerifyingKeyMaterial::X509Certificate(
+                PAYPAL_CERT_PEM.to_vec(),
+            ));
+        attempt(Provider::PayPal, &headers, body, WELL_FORMED_SECRET, &paypal_options);
+        attempt(
+            Provider::PayPal,
+            &headers,
+            body,
+            WELL_FORMED_SECRET,
+            &VerifyOptions::default(),
+        );
+    }
+    #[cfg(not(feature = "paypal"))]
     attempt(Provider::PayPal, &headers, body, WELL_FORMED_SECRET, &VerifyOptions::default());
 
     // SendGrid reaches its ECDSA path only with caller-supplied key material;
